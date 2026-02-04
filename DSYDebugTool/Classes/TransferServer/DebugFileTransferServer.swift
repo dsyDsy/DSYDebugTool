@@ -16,6 +16,9 @@ public class DebugFileTransferServer: NSObject {
     
     /// Debug 开关，控制是否输出日志
     public var isDebugEnabled: Bool = true
+    
+    /// 端口被占用时，自动顺延尝试的次数（例如 20 表示最多尝试 `serverPort...serverPort+20`）
+    public var portAutoRetryCount: UInt = 20
 
     private var webServer: GCDWebServer?
     public private(set) var isRunning = false
@@ -35,6 +38,19 @@ public class DebugFileTransferServer: NSObject {
                     lineNumber : UInt = #line) {
         guard isDebugEnabled else { return }
         print("[文件传输助手][\((file.description as NSString).lastPathComponent): \(method) line:\(lineNumber)]---> \(message)")
+    }
+    
+    private func isPortInUseError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        // POSIX: EADDRINUSE = 48
+        if nsError.domain == NSPOSIXErrorDomain && nsError.code == 48 {
+            return true
+        }
+        let desc = nsError.localizedDescription.lowercased()
+        if desc.contains("address already in use") || desc.contains("eaddrinuse") || desc.contains("port") && desc.contains("in use") {
+            return true
+        }
+        return false
     }
     
     public func startServer(completion: @escaping (Bool, String?) -> Void) {
@@ -121,31 +137,48 @@ public class DebugFileTransferServer: NSObject {
             return self?.handleMainPage() ?? GCDWebServerErrorResponse(statusCode: 500)
         }
         
-        // 启动服务器
-        do {
-            try webServer?.start(options: [
-                GCDWebServerOption_Port: serverPort,
-                GCDWebServerOption_BindToLocalhost: false,
-                GCDWebServerOption_AutomaticallySuspendInBackground: false,
-                GCDWebServerOption_ConnectedStateCoalescingInterval: 2.0
-            ])
-            
-            isRunning = true
-            let ipAddress = getWiFiAddress() ?? "未知IP"
-            
-            DebugFileTransferServer.shared.log("📡 GCDWebServer 已启动: http://\(ipAddress):\(serverPort)")
-            DebugFileTransferServer.shared.log("📡 服务器配置:")
-            DebugFileTransferServer.shared.log("   - 端口: \(serverPort)")
-            DebugFileTransferServer.shared.log("   - 绑定到localhost: false")
-            DebugFileTransferServer.shared.log("   - 后台运行: true")
-            
-            completion(true, getCompleteAddress())
-            
-        } catch {
-            DebugFileTransferServer.shared.log("❌ 启动 GCDWebServer 失败: \(error)")
-            isRunning = false
-            completion(false, nil)
+        // 启动服务器（端口占用时自动顺延）
+        let basePort = serverPort
+        let maxTry = portAutoRetryCount
+        var lastError: Error?
+        
+        for offset in 0...maxTry {
+            let tryPort = basePort + offset
+            do {
+                try webServer?.start(options: [
+                    GCDWebServerOption_Port: tryPort,
+                    GCDWebServerOption_BindToLocalhost: false,
+                    GCDWebServerOption_AutomaticallySuspendInBackground: false,
+                    GCDWebServerOption_ConnectedStateCoalescingInterval: 2.0
+                ])
+                
+                // 成功：回写实际端口
+                serverPort = tryPort
+                isRunning = true
+                
+                let ipAddress = getWiFiAddress() ?? "未知IP"
+                DebugFileTransferServer.shared.log("📡 GCDWebServer 已启动: http://\(ipAddress):\(serverPort)")
+                DebugFileTransferServer.shared.log("📡 服务器配置:")
+                DebugFileTransferServer.shared.log("   - 端口: \(serverPort)")
+                DebugFileTransferServer.shared.log("   - 绑定到localhost: false")
+                DebugFileTransferServer.shared.log("   - 后台运行: true")
+                
+                completion(true, getCompleteAddress())
+                return
+            } catch {
+                lastError = error
+                if isPortInUseError(error), offset < maxTry {
+                    DebugFileTransferServer.shared.log("⚠️ 端口 \(tryPort) 被占用，尝试下一个端口...")
+                    continue
+                } else {
+                    break
+                }
+            }
         }
+        
+        DebugFileTransferServer.shared.log("❌ 启动 GCDWebServer 失败（已尝试 \(maxTry + 1) 个端口，从 \(basePort) 起）: \(String(describing: lastError))")
+        isRunning = false
+        completion(false, nil)
     }
     
     public func stopServer() {
