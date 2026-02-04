@@ -266,19 +266,20 @@ public class DebugFileUploadViewController: UIViewController, UIImagePickerContr
         let fileName = "文字内容_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).txt"
         let textData = text.data(using: .utf8) ?? Data()
         
-        print("web_test📝 上传文字内容: \(text)")
-        print("web_test📝 文件名: \(fileName)")
-        print("web_test📝 数据大小: \(textData.count) bytes")
-        DebugFileTransferServer.shared.uploadFile(name: fileName, data: textData)
+         DebugFileTransferServer.shared.log("web_test📝 上传文字内容: \(text)")
+         DebugFileTransferServer.shared.log("web_test📝 文件名: \(fileName)")
+         DebugFileTransferServer.shared.log("web_test📝 数据大小: \(textData.count) bytes")
+         DebugFileTransferServer.shared.uploadFile(name: fileName, data: textData)
     }
     
     private  func uploadTextContent(_ text: String) {
         let fileName = "文字内容_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).txt"
         let textData = text.data(using: .utf8) ?? Data()
         
-        print("web_test📝 上传文字内容: \(text)")
-        print("web_test📝 文件名: \(fileName)")
-        print("web_test📝 数据大小: \(textData.count) bytes")
+         DebugFileTransferServer.shared.log("web_test📝 上传文字内容: \(text)")
+         DebugFileTransferServer.shared.log("web_test📝 文件名: \(fileName)")
+         DebugFileTransferServer.shared.log("web_test📝 数据大小: \(textData.count) bytes")
+        DebugFileTransferServer.shared.uploadFile(name: fileName, data: textData)
         showAlert(title: "上传成功", message: "文字内容已上传为文件：\(fileName)\n大小：\(textData.count) bytes")
     }
     
@@ -307,16 +308,16 @@ public class DebugFileUploadViewController: UIViewController, UIImagePickerContr
             if let image = info[.originalImage] as? UIImage {
                 fileName = "图片_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).jpg"
                 fileData = image.jpegData(compressionQuality: 0.8)
-                print("web_test📷 处理图片: \(fileName), 原始尺寸: \(image.size), 数据大小: \(fileData?.count ?? 0) bytes")
+                 DebugFileTransferServer.shared.log("web_test📷 处理图片: \(fileName), 原始尺寸: \(image.size), 数据大小: \(fileData?.count ?? 0) bytes")
             }
             // 处理视频
             else if let videoURL = info[.mediaURL] as? URL {
                 fileName = "视频_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).\(videoURL.pathExtension)"
                 do {
                     fileData = try Data(contentsOf: videoURL)
-                    print("web_test🎥 处理视频: \(fileName), 数据大小: \(fileData?.count ?? 0) bytes")
+                     DebugFileTransferServer.shared.log("web_test🎥 处理视频: \(fileName), 数据大小: \(fileData?.count ?? 0) bytes")
                 } catch {
-                    print("web_test❌ 读取视频失败: \(error)")
+                     DebugFileTransferServer.shared.log("web_test❌ 读取视频失败: \(error)")
                     DispatchQueue.main.async {
                         progressAlert.dismiss(animated: true) {
                             self?.showAlert(title: "错误", message: "读取视频文件失败: \(error.localizedDescription)")
@@ -371,19 +372,19 @@ extension DebugFileUploadViewController: UIDocumentPickerDelegate {
     }
     
     private func uploadFile(at url: URL) {
-        print("web_test📄 尝试上传文件: \(url.path)")
-        print("web_test📄 文件URL: \(url)")
+         DebugFileTransferServer.shared.log("web_test📄 尝试上传文件: \(url.path)")
+         DebugFileTransferServer.shared.log("web_test📄 文件URL: \(url)")
         
         // 检查文件是否存在
         guard FileManager.default.fileExists(atPath: url.path) else {
-            print("web_test❌ 文件不存在: \(url.path)")
+             DebugFileTransferServer.shared.log("web_test❌ 文件不存在: \(url.path)")
             showAlert(title: "错误", message: "文件不存在")
             return
         }
         
         // 尝试访问安全作用域资源
         let hasAccess = url.startAccessingSecurityScopedResource()
-        print("web_test📄 安全作用域访问: \(hasAccess)")
+         DebugFileTransferServer.shared.log("web_test📄 安全作用域访问: \(hasAccess)")
         
         defer {
             if hasAccess {
@@ -399,7 +400,7 @@ extension DebugFileUploadViewController: UIDocumentPickerDelegate {
             // 方法1: 直接读取
             if let directData = try? Data(contentsOf: url) {
                 data = directData
-                print("web_test✅ 直接读取成功")
+                 DebugFileTransferServer.shared.log("web_test✅ 直接读取成功")
             }
             // 方法2: 通过文件协调器读取
             else {
@@ -410,14 +411,14 @@ extension DebugFileUploadViewController: UIDocumentPickerDelegate {
                 coordinator.coordinate(readingItemAt: url, options: [], error: &coordinatorError) { (readingURL) in
                     do {
                         coordinatedData = try Data(contentsOf: readingURL)
-                        print("web_test✅ 协调器读取成功")
+                         DebugFileTransferServer.shared.log("web_test✅ 协调器读取成功")
                     } catch {
-                        print("web_test❌ 协调器读取失败: \(error)")
+                         DebugFileTransferServer.shared.log("web_test❌ 协调器读取失败: \(error)")
                     }
                 }
                 
                 if let error = coordinatorError {
-                    print("web_test❌ 文件协调器错误: \(error)")
+                     DebugFileTransferServer.shared.log("web_test❌ 文件协调器错误: \(error)")
                 }
                 
                 data = coordinatedData
@@ -432,14 +433,14 @@ extension DebugFileUploadViewController: UIDocumentPickerDelegate {
                 fileName = decodedName
             }
             
-            print("web_test📄 上传文档: \(fileName), 大小: \(fileData.count) bytes")
+             DebugFileTransferServer.shared.log("web_test📄 上传文档: \(fileName), 大小: \(fileData.count) bytes")
             
             DebugFileTransferServer.shared.uploadFile(name: fileName, data: fileData)
             
             showAlert(title: "上传成功", message: "文件 \(fileName) 已上传到服务器\n大小：\(formatFileSize(fileData.count))")
             
         } catch {
-            print("web_test❌ 读取文档失败: \(error)")
+             DebugFileTransferServer.shared.log("web_test❌ 读取文档失败: \(error)")
             showAlert(title: "上传失败", message: "读取文件失败: \(error.localizedDescription)")
         }
     }
@@ -464,7 +465,7 @@ extension String {
                 return String(self[range])
             }
         } catch {
-            print("web_test❌ 正则表达式错误: \(error)")
+             DebugFileTransferServer.shared.log("web_test❌ 正则表达式错误: \(error)")
             return []
         }
     }

@@ -408,6 +408,7 @@ class NetworkDetailViewController: UITableViewController, MFMailComposeViewContr
         if  let  customNetworkShareHandler = CocoaDebugSettings.shared.customNetworkShareHandler {
             let  quickAction: UIAlertAction = UIAlertAction(title: CocoaDebugSettings.shared.customNetworkShareTitle, style: .default) { [weak self] action -> Void in
                 guard let self = self else { return }
+                _ = self.configureMailComposer(true)
                 customNetworkShareHandler(self.messageBody, self.httpModel)
             }
             alert.addAction(quickAction)
