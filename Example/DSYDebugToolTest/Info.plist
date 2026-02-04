@@ -21,5 +21,9 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>allow TestApp to access photo library on your device to set your profile?</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>allow TestApp to access photo library on your device to set your profile?</string>
 </dict>
 </plist>

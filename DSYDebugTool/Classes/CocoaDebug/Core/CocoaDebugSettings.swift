@@ -9,9 +9,9 @@
 import Foundation
  extension  CocoaDebugSettings{
     public struct BubbleSettings{
-        var size:CGSize
-        var backgroundColor:UIColor
-        var numberLabelColor:UIColor
+        public var size:CGSize
+        public var backgroundColor:UIColor
+        public var numberLabelColor:UIColor
         public init(size: CGSize = CGSize(width: 25, height: 25),
                     backgroundColor: UIColor =  .black,
                     numberLabelColor: UIColor = .white) {
@@ -27,7 +27,13 @@ import Foundation
     
     @objc public static let shared = CocoaDebugSettings()
     
-    public var bubbleSettings = CocoaDebugSettings.BubbleSettings()
+    public var bubbleSettings = CocoaDebugSettings.BubbleSettings() {
+        didSet {
+            NotificationCenter.default.post(name: NSNotification.Name("COCOADEBUG_BUBBLE_SETTINGS_CHANGED"),
+                                            object: nil,
+                                            userInfo: nil)
+        }
+    }
     @objc public var slowAnimations: Bool = false {
         didSet {            
             if slowAnimations == false {

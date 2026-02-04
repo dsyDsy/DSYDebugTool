@@ -65,6 +65,15 @@ class ViewController: UIViewController {
         return view
     }()
     
+    lazy  var fileTransferBtn: UIButton = {
+        let view = UIButton()
+        view.setTitle("展示文件传输助手", for: .normal)
+        view.setTitleColor(.blue, for: .normal)
+        view.backgroundColor = .black
+        view.addTarget(self, action: #selector(fileTransferBtn(btn:)), for: .touchUpInside)
+        return view
+    }()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -88,10 +97,18 @@ class ViewController: UIViewController {
             make.centerX.equalToSuperview()
         }
         
+        self.view.addSubview(fileTransferBtn)
+        fileTransferBtn.snp.makeConstraints { make in
+            make.top.equalTo(clickBtn.snp.bottom).offset(30)
+            make.width.equalTo(150)
+            make.height.equalTo(44)
+            make.centerX.equalToSuperview()
+        }
+        
         webServerLabel.text =  "文件助手地址：\(DebugFileTransferServer.shared.getCompleteAddress() ?? "未开启")"
         
     }
-    
+   
     @objc func test(btn:UIButton){
         let url  = URLRequest(url: URL(string: "https://www.baidu.com")!)
         URLSession.shared.dataTask(with: url){ data, response, error in
@@ -106,13 +123,28 @@ class ViewController: UIViewController {
         
     }
     
+    @objc func fileTransferBtn(btn:UIButton){
+        DebugFileTransferServer.shared.startServer { [weak self] success, address in
+            if success, let address = address {
+                let uploadVC = DebugFileUploadViewController()
+                let navController = UINavigationController(rootViewController: uploadVC)
+                self?.present(navController, animated: true)
+            }else {
+                self?.msgLabel.text = "服务开启失败，不支持发送。请再次尝试......"
+            }
+        }
+       
+    }
+    
+    
     class func initTool() {
 
         CocoaDebugSettings.shared.bubbleSettings = CocoaDebugSettings.BubbleSettings(
             size: CGSize(width: 36, height: 36),
             backgroundColor:  .black,
             numberLabelColor: .white)
-       
+        
+        CocoaDebug.mainColor = "#FFD42A"
         CocoaDebugSettings.shared.enableLogMonitoring = true
         CocoaDebugSettings.shared.disableNetworkMonitoring = false
         CocoaDebugSettings.shared.enableMemoryLeaksMonitoring_ViewController = true
@@ -139,6 +171,7 @@ class ViewController: UIViewController {
                 vc?.msgLabel.text = "正在开启服务，请稍等......"
                 DebugFileTransferServer.shared.startServer { success, address in
                     if success, let address = address {
+                        
                         DebugFileUploadViewController.uploadTextContent(messageBody)
                         vc?.msgLabel.text = "发送完成，打开浏览器查看"
                         vc?.webServerLabel.text = address

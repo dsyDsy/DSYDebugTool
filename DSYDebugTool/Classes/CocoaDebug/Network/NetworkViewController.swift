@@ -117,11 +117,16 @@ class NetworkViewController: UIViewController {
         searchBar.isHidden = true
         
         //hide searchBar icon
-        let textFieldInsideSearchBar = searchBar.value(forKey: "searchField") as! UITextField
-        textFieldInsideSearchBar.leftViewMode = .never
-        textFieldInsideSearchBar.leftView = nil
-        textFieldInsideSearchBar.backgroundColor = .white
-        textFieldInsideSearchBar.returnKeyType = .default
+        if let textFieldInsideSearchBar = searchBar.value(forKey: "searchField") as? UITextField {
+            textFieldInsideSearchBar.leftViewMode = .never
+            textFieldInsideSearchBar.leftView = nil
+            if #available(iOS 13.0, *) {
+                textFieldInsideSearchBar.backgroundColor = .secondarySystemBackground
+            } else {
+                textFieldInsideSearchBar.backgroundColor = .white
+            }
+            textFieldInsideSearchBar.returnKeyType = .default
+        }
         
         reloadHttp(needScrollToEnd: true)
         

@@ -105,7 +105,7 @@
     tap.cancelsTouchesInView = NO;
     [self.view addGestureRecognizer:tap];
     
-    //liman
+    // keep navigation bar consistent with other CocoaDebug pages
     self.navigationController.navigationBar.barTintColor = [UIColor colorWithRed:31/255.0 green:33/255.0 blue:36/255.0 alpha:1.0];
     self.navigationItem.backBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"" style:UIBarButtonItemStylePlain target:nil action:nil];
     
@@ -140,6 +140,16 @@
         [self.navigationController setToolbarHidden:YES animated:YES];
     }
     [self.searchBar resignFirstResponder];
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    // Ensure sandbox list refreshes its colors promptly when interface style changes
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+            [self.tableView reloadData];
+        }
+    }
 }
 
 #pragma mark - Private Methods
@@ -190,7 +200,12 @@
     
     self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
     self.searchBar.delegate = self;
-    self.searchBar.barTintColor = [UIColor blackColor];
+    if (@available(iOS 13.0, *)) {
+        self.searchBar.barTintColor = [UIColor clearColor];
+        self.searchBar.searchBarStyle = UISearchBarStyleMinimal;
+    } else {
+        self.searchBar.barTintColor = [UIColor blackColor];
+    }
     self.searchBar.enablesReturnKeyAutomatically = NO;
     [self.view addSubview:self.searchBar];
     
@@ -198,7 +213,12 @@
     UITextField *textFieldInsideSearchBar = [self.searchBar valueForKey:@"searchField"];
     textFieldInsideSearchBar.leftViewMode = UITextFieldViewModeNever;
     textFieldInsideSearchBar.leftView = nil;
-    textFieldInsideSearchBar.backgroundColor = [UIColor whiteColor];
+    if (@available(iOS 13.0, *)) {
+        textFieldInsideSearchBar.backgroundColor = [UIColor secondarySystemBackgroundColor];
+        textFieldInsideSearchBar.textColor = [UIColor labelColor];
+    } else {
+        textFieldInsideSearchBar.backgroundColor = [UIColor whiteColor];
+    }
     textFieldInsideSearchBar.returnKeyType = UIReturnKeyDefault;
 }
 

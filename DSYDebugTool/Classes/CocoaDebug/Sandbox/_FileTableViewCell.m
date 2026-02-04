@@ -23,8 +23,7 @@ NSString *const _FileTableViewCellReuseIdentifier = @"_FileCell";
 }
 
 - (void)setupViews {
-    
-    //liman
+    // keep style consistent with other CocoaDebug pages (dark background)
     self.backgroundColor = [UIColor blackColor];
     self.contentView.backgroundColor = [UIColor blackColor];
     

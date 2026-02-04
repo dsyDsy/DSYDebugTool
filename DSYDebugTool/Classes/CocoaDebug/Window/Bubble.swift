@@ -123,25 +123,38 @@ class Bubble: UIView {
     
     
     fileprivate func initLayer() {
-        self.backgroundColor =  CocoaDebugSettings.shared.bubbleSettings.backgroundColor
-        self.layer.cornerRadius = _width/2
-        self.sizeToFit()
-        
-        if let numberLabel = numberLabel {
-            numberLabel.text = String(networkNumber)
-            numberLabel.textColor = CocoaDebugSettings.shared.bubbleSettings.numberLabelColor
-            numberLabel.textAlignment = .center
-            numberLabel.adjustsFontSizeToFitWidth = true
-            numberLabel.isHidden = true
-            numberLabel.frame = CGRect(x:0, y:0, width:_width, height:_height)
-            self.addSubview(numberLabel)
-        }
+        applySettings()
         
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(Bubble.tap))
         self.addGestureRecognizer(tapGesture)
         
         let longTap = UILongPressGestureRecognizer.init(target: self, action: #selector(Bubble.longTap))
         self.addGestureRecognizer(longTap)
+    }
+
+    fileprivate func  applySettings() {
+        width = _width
+        height = _height
+        
+        self.backgroundColor = CocoaDebugSettings.shared.bubbleSettings.backgroundColor
+        self.layer.cornerRadius = width / 2
+        
+        if let numberLabel = numberLabel {
+            numberLabel.text = String(networkNumber)
+            numberLabel.textColor = CocoaDebugSettings.shared.bubbleSettings.numberLabelColor
+            numberLabel.textAlignment = .center
+            numberLabel.adjustsFontSizeToFitWidth = true
+            numberLabel.isHidden = networkNumber == 0
+            numberLabel.frame = CGRect(x: 0, y: 0, width: width, height: height)
+            if numberLabel.superview == nil {
+                self.addSubview(numberLabel)
+            }
+        }
+        
+        // 同步当前 frame 尺寸（保持中心不变）
+        let currentCenter = self.center
+        self.bounds = CGRect(x: 0, y: 0, width: width, height: height)
+        self.center = currentCenter
     }
     
     func changeSideDisplay() {
@@ -179,6 +192,10 @@ class Bubble: UIView {
         
         NotificationCenter.default.addObserver(forName: NSNotification.Name(rawValue: "SHOW_COCOADEBUG_FORCE"), object: nil, queue: OperationQueue.main) { [weak self] _ in
             self?.show_cocoadebug_force()
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("COCOADEBUG_BUBBLE_SETTINGS_CHANGED"), object: nil, queue: OperationQueue.main) { [weak self] _ in
+            self?.applySettings()
         }
     }
     

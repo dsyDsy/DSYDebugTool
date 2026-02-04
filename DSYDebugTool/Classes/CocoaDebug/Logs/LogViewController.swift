@@ -352,19 +352,31 @@ class LogViewController: UIViewController {
         let textFieldInsideSearchBar = defaultSearchBar.value(forKey: "searchField") as! UITextField
         textFieldInsideSearchBar.leftViewMode = .never
         textFieldInsideSearchBar.leftView = nil
-        textFieldInsideSearchBar.backgroundColor = .white
+        if #available(iOS 13.0, *) {
+            textFieldInsideSearchBar.backgroundColor = .secondarySystemBackground
+        } else {
+            textFieldInsideSearchBar.backgroundColor = .white
+        }
         textFieldInsideSearchBar.returnKeyType = .default
         
         let textFieldInsideSearchBar2 = rnSearchBar.value(forKey: "searchField") as! UITextField
         textFieldInsideSearchBar2.leftViewMode = .never
         textFieldInsideSearchBar2.leftView = nil
-        textFieldInsideSearchBar2.backgroundColor = .white
+        if #available(iOS 13.0, *) {
+            textFieldInsideSearchBar2.backgroundColor = .secondarySystemBackground
+        } else {
+            textFieldInsideSearchBar2.backgroundColor = .white
+        }
         textFieldInsideSearchBar2.returnKeyType = .default
         
         let textFieldInsideSearchBar3 = webSearchBar.value(forKey: "searchField") as! UITextField
         textFieldInsideSearchBar3.leftViewMode = .never
         textFieldInsideSearchBar3.leftView = nil
-        textFieldInsideSearchBar3.backgroundColor = .white
+        if #available(iOS 13.0, *) {
+            textFieldInsideSearchBar3.backgroundColor = .secondarySystemBackground
+        } else {
+            textFieldInsideSearchBar3.backgroundColor = .white
+        }
         textFieldInsideSearchBar3.returnKeyType = .default
     }
     

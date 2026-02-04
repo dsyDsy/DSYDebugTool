@@ -17,7 +17,11 @@ class UIBlockingBubble: UIView {
     }()
     
     fileprivate func initLayer() {
-        self.backgroundColor = .white
+        if #available(iOS 13.0, *) {
+            self.backgroundColor = .secondarySystemBackground
+        } else {
+            self.backgroundColor = .white
+        }
         self.layer.cornerRadius = 4
         self.sizeToFit()
         
@@ -41,7 +45,11 @@ class UIBlockingBubble: UIView {
         uiBlockingLabel?.textAlignment = .center
         uiBlockingLabel?.adjustsFontSizeToFitWidth = true
         uiBlockingLabel?.text = "Normal"
-        uiBlockingLabel?.textColor = .white
+        if #available(iOS 13.0, *) {
+            uiBlockingLabel?.textColor = .label
+        } else {
+            uiBlockingLabel?.textColor = .black
+        }
         
         NotificationCenter.default.addObserver(forName: NSNotification.Name(rawValue: "CocoaDebug_Detected_UI_Blocking"), object: nil, queue: OperationQueue.main) { [weak self] _ in
             self?.uiBlockingLabel?.text = "Blocking"
@@ -49,7 +57,11 @@ class UIBlockingBubble: UIView {
             
             DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 1) {[weak self] in
                 self?.uiBlockingLabel?.text = "Normal"
-                self?.uiBlockingLabel?.textColor = .white
+                if #available(iOS 13.0, *) {
+                    self?.uiBlockingLabel?.textColor = .label
+                } else {
+                    self?.uiBlockingLabel?.textColor = .black
+                }
             }
         }
     }
