@@ -404,16 +404,30 @@ class NetworkDetailViewController: UITableViewController, MFMailComposeViewContr
         let alert: UIAlertController = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
         
         // create an action
-        let firstAction: UIAlertAction = UIAlertAction(title: "share via email", style: .default) { [weak self] action -> Void in
-            if let mailComposeViewController = self?.configureMailComposer() {
-                self?.present(mailComposeViewController, animated: true, completion: nil)
+       
+        if  let  customNetworkShareHandler = CocoaDebugSettings.shared.customNetworkShareHandler {
+            let  quickAction: UIAlertAction = UIAlertAction(title: CocoaDebugSettings.shared.customNetworkShareTitle, style: .default) { [weak self] action -> Void in
+                guard let self = self else { return }
+                customNetworkShareHandler(self.messageBody, self.httpModel)
             }
+            alert.addAction(quickAction)
+         
+        }
+       
+        if  CocoaDebugSettings.shared.emailToRecipients?.count ?? 0 > 0 && CocoaDebugSettings.shared.emailToRecipients?.first?.count  ?? 0 > 0 {
+            let firstAction: UIAlertAction = UIAlertAction(title: "share via email", style: .default) { [weak self] action -> Void in
+                if let mailComposeViewController = self?.configureMailComposer() {
+                    self?.present(mailComposeViewController, animated: true, completion: nil)
+                }
+            }
+            alert.addAction(firstAction)
         }
         
         let secondAction: UIAlertAction = UIAlertAction(title: "copy to clipboard", style: .default) { [weak self] action -> Void in
             _ = self?.configureMailComposer(true)
             UIPasteboard.general.string = self?.messageBody
         }
+        alert.addAction(secondAction)
         
         let moreAction: UIAlertAction = UIAlertAction(title: "more", style: .default) { [weak self] action -> Void in
             guard let self = self else { return }
@@ -447,15 +461,9 @@ class NetworkDetailViewController: UITableViewController, MFMailComposeViewContr
             }
 
         }
-        
-        let cancelAction: UIAlertAction = UIAlertAction(title: "Cancel", style: .cancel) { action -> Void in
-        }
-        
-        // add actions
-        alert.addAction(secondAction)
-        alert.addAction(firstAction)
+    
         alert.addAction(moreAction)
-        alert.addAction(cancelAction)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         
         alert.popoverPresentationController?.permittedArrowDirections = .init(rawValue: 0)
         alert.popoverPresentationController?.sourceView = self.view
