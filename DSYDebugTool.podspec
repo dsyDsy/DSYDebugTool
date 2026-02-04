@@ -14,7 +14,7 @@ TODO: Add long description of the pod here.
   s.author           = { 'dsy' => 'dsy.ds@qq.com' }
   s.source           = { :git => 'https://github.com/dsyDsy/DSYDebugTool.git', :tag => s.version.to_s }
   
-  s.ios.deployment_target = '12.0'
+  s.ios.deployment_target = '13.0'
   
   # 基于CocoaDebug改动 原项目地址 https://github.com/CocoaDebug/CocoaDebug
   s.subspec 'CocoaDebug' do |ss|

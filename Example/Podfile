@@ -1,13 +1,23 @@
-use_frameworks!
 
-platform :ios, '10.0'
-
-target 'DSYDebugTool_Example' do
+source 'https://github.com/CocoaPods/Specs.git'
+iosTargetVersion = '16.0'
+target 'DSYDebugToolTest' do
+  use_frameworks!
+  platform :ios, iosTargetVersion
+  pod 'SnapKit', '~> 5.0'
+#  pod 'DSYDebugTool/TransferServer', :path => '../'
   pod 'DSYDebugTool', :path => '../'
+end
 
-  target 'DSYDebugTool_Tests' do
-    inherit! :search_paths
-
-    
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    # 禁用bitcode
+    target.build_configurations.each do |config|
+      
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = iosTargetVersion
+     # config.build_settings['ENABLE_BITCODE'] = 'NO'
+     # config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+     # config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
+    end
   end
 end
