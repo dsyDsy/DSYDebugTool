@@ -163,6 +163,7 @@ class ViewController: UIViewController {
         CocoaDebugSettings.shared.enableUIBlockingMonitoring = false
         CocoaDebugSettings.shared.enableWKWebViewMonitoring = true
         CocoaDebugSettings.shared.enableCrashRecording = true
+        CocoaDebugSettings.shared.enableRNMonitoring  = false
         CocoaDebugSettings.shared.logCount = 500;
         CocoaDebugSettings.shared.httpCount = 200
         // 配置自定义分享入口
