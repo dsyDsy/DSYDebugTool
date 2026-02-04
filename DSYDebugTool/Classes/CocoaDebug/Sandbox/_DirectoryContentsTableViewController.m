@@ -106,9 +106,11 @@
     [self.view addGestureRecognizer:tap];
     
     // keep navigation bar consistent with other CocoaDebug pages
-    self.navigationController.navigationBar.barTintColor = [UIColor colorWithRed:31/255.0 green:33/255.0 blue:36/255.0 alpha:1.0];
+  
     self.navigationItem.backBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"" style:UIBarButtonItemStylePlain target:nil action:nil];
-    
+    self.navigationController.navigationBar.barTintColor =  _Sandboxer.shared.mainClor;
+    self.navigationItem.backBarButtonItem.tintColor =  _Sandboxer.shared.mainClor;
+
     //liman
     if (_IsStringEmpty(self.title)) {
         if (self.isHomeDirectory) {
@@ -145,6 +147,8 @@
 - (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
     // Ensure sandbox list refreshes its colors promptly when interface style changes
+    self.navigationController.navigationBar.barTintColor =  _Sandboxer.shared.mainClor;
+    self.navigationItem.backBarButtonItem.tintColor =  _Sandboxer.shared.mainClor;
     if (@available(iOS 13.0, *)) {
         if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
             [self.tableView reloadData];
@@ -168,7 +172,8 @@
     } else {
         self.navigationItem.rightBarButtonItems = @[self.closeItem, self.refreshItem];
     }
-    
+    self.closeItem.tintColor =  _Sandboxer.shared.mainClor;
+    self.refreshItem.tintColor =  _Sandboxer.shared.mainClor;
     
     //
     self.view.backgroundColor = [UIColor blackColor];

@@ -25,6 +25,7 @@
 @property (nonatomic, assign, getter=isDirectoryDeletable) BOOL directoryDeletable; // Default is NO
 
 - (instancetype)init __attribute__((unavailable("Use [_Sandboxer shared] or _Sandboxer.shared instead.")));
+@property (nonatomic, strong) UIColor * mainClor;
 
 //liman
 - (UINavigationController *)homeDirectoryNavigationController;

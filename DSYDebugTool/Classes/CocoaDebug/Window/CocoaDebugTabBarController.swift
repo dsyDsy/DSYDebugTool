@@ -20,11 +20,12 @@ class CocoaDebugTabBarController: UITabBarController {
         
         self.selectedIndex = CocoaDebugSettings.shared.tabBarSelectItem 
         self.tabBar.tintColor = Color.mainGreen
-        
+        self.view.backgroundColor = "#1f2124".hexColor
         //bugfix #issues-158
         if #available(iOS 13, *) {
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = "#1f2124".hexColor
             appearance.shadowColor = .clear    //removing navigationbar 1 px bottom border.
 //            self.tabBar.appearance().standardAppearance = appearance
 //            self.tabBar.appearance().scrollEdgeAppearance = appearance
@@ -64,6 +65,7 @@ class CocoaDebugTabBarController: UITabBarController {
         _Sandboxer.shared.isShareable = true
         _Sandboxer.shared.isFileDeletable = true
         _Sandboxer.shared.isDirectoryDeletable = true
+        _Sandboxer.shared.mainClor = Color.mainGreen
         guard let sandbox = _Sandboxer.shared.homeDirectoryNavigationController() else {return}
         sandbox.tabBarItem.title = "Sandbox"
         sandbox.tabBarItem.image = UIImage.init(named: "_icon_file_type_sandbox", in: Bundle.init(for: CocoaDebug.self), compatibleWith: nil)

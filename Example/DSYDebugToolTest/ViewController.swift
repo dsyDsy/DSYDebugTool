@@ -104,9 +104,11 @@ class ViewController: UIViewController {
             make.height.equalTo(44)
             make.centerX.equalToSuperview()
         }
-        
-        webServerLabel.text =  "文件助手地址：\(DebugFileTransferServer.shared.getCompleteAddress() ?? "未开启")"
-        
+        if  DebugFileTransferServer.shared.isRunning == false {
+            webServerLabel.text = "文件助手未启动"
+        }else {
+            webServerLabel.text =  "文件助手地址：\(DebugFileTransferServer.shared.getCompleteAddress() ?? "未开启")"
+        }
     }
    
     @objc func test(btn:UIButton){
@@ -124,15 +126,22 @@ class ViewController: UIViewController {
     }
     
     @objc func fileTransferBtn(btn:UIButton){
-        DebugFileTransferServer.shared.startServer { [weak self] success, address in
-            if success, let address = address {
-                let uploadVC = DebugFileUploadViewController()
-                let navController = UINavigationController(rootViewController: uploadVC)
-                self?.present(navController, animated: true)
-            }else {
-                self?.msgLabel.text = "服务开启失败，不支持发送。请再次尝试......"
+        if  DebugFileTransferServer.shared.isRunning == false {
+            DebugFileTransferServer.shared.startServer { [weak self] success, address in
+                if success, let address = address {
+                    let uploadVC = DebugFileUploadViewController()
+                    let navController = UINavigationController(rootViewController: uploadVC)
+                    self?.present(navController, animated: true)
+                }else {
+                    self?.msgLabel.text = "服务开启失败，不支持发送。请再次尝试......"
+                }
             }
+        }else {
+            let uploadVC = DebugFileUploadViewController()
+            let navController = UINavigationController(rootViewController: uploadVC)
+            self.present(navController, animated: true)
         }
+     
        
     }
     
