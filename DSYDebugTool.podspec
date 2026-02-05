@@ -44,4 +44,12 @@ TODO: Add long description of the pod here.
             ss.frameworks          = 'UIKit', 'Foundation'
             ss.dependency  'GCDWebServer'
       end
+    
+    s.subspec 'Screenshot' do |ss|
+            ss.source_files        = "DSYDebugTool/Classes/Screenshot", "DSYDebugTool/Classes/Screenshot/**/*.{h,m,mm,swift,c}"
+            ss.resources           = "DSYDebugTool/Classes/Screenshot/**/*.{png,xib,storyboard}"
+            ss.frameworks          = 'UIKit', 'Foundation'
+            ss.dependency  'ZLImageEditor'
+      end
+    
 end
