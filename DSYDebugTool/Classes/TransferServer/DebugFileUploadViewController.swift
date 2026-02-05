@@ -262,25 +262,11 @@ public class DebugFileUploadViewController: UIViewController, UIImagePickerContr
         present(alertController, animated: true)
     }
     
-    public static  func uploadTextContent(_ text: String) {
-        let fileName =  DebugFileTransferServer.shared.textName()
-        let textData = text.data(using: .utf8) ?? Data()
-        
-         DebugFileTransferServer.shared.log("web_test📝 上传文字内容: \(text)")
-         DebugFileTransferServer.shared.log("web_test📝 文件名: \(fileName)")
-         DebugFileTransferServer.shared.log("web_test📝 数据大小: \(textData.count) bytes")
-         DebugFileTransferServer.shared.uploadFile(name: fileName, data: textData)
-    }
     
     private  func uploadTextContent(_ text: String) {
-        let fileName = "文字内容_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).txt"
-        let textData = text.data(using: .utf8) ?? Data()
-        
-         DebugFileTransferServer.shared.log("web_test📝 上传文字内容: \(text)")
-         DebugFileTransferServer.shared.log("web_test📝 文件名: \(fileName)")
-         DebugFileTransferServer.shared.log("web_test📝 数据大小: \(textData.count) bytes")
-        DebugFileTransferServer.shared.uploadFile(name: fileName, data: textData)
-        showAlert(title: "上传成功", message: "文字内容已上传为文件：\(fileName)\n大小：\(textData.count) bytes")
+        DebugFileTransferServer.shared.uploadTextContent(text) {[weak self] fileName, textData in
+            self?.showAlert(title: "上传成功", message: "文字内容已上传为文件：\(fileName)\n大小：\(textData.count) bytes")
+        }
     }
     
     // MARK: - UIImagePickerControllerDelegate

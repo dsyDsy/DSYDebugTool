@@ -33,7 +33,11 @@ public class DebugScreenshotManager {
         NotificationCenter.default.addObserver(self, selector: #selector(handleScreenDidChange), name: UIApplication.userDidTakeScreenshotNotification, object: nil)
     }
     
-    @objc public  func handleScreenDidChange(notification: NSNotification) {
+    public func didScreenshot(){
+       self.handleScreenDidChange(notification: NSNotification(name: UIApplication.userDidTakeScreenshotNotification, object: nil))
+    }
+    
+    @objc   func handleScreenDidChange(notification: NSNotification) {
         guard isEnableMonitoring == true,let appWindow = appWindow else { return }
         // 确保在主线程执行截屏与 UI 操作
         DispatchQueue.main.async {
@@ -161,7 +165,7 @@ extension DebugScreenshotManager {
     @objc private func screenshotSendTapped() {
         hideScreenshotPreview()
         if let image = lastScreenshotImage {
-            self.uploadScreenshot(isSend: true, image: image)
+            self.screenshotUpload(isSend: true, image: image)
         }
         lastScreenshotImage = nil
        
@@ -184,12 +188,12 @@ extension DebugScreenshotManager {
             let h = w * image.zl.height / image.zl.width
             image = image.zl.resize(CGSize(width: w, height: h)) ?? image
             ZLEditImageViewController.showEditImageVC(parentVC: topVC, image: image) { resImage, editModel in
-                self.uploadScreenshot(isSend: false, image: resImage)
+                self.screenshotUpload(isSend: false, image: resImage)
             }
         }
     }
 
-    func uploadScreenshot(isSend:Bool,image:UIImage){
+    func screenshotUpload(isSend:Bool,image:UIImage){
         if isSend {
             // 使用方式
             self.saveImage(image) { result in
@@ -226,6 +230,8 @@ extension DebugScreenshotManager {
                         }
                     }
                   
+                }else {
+                    DebugActionSheetHelper.showAlert(message: "图片处理失败", presentingViewController: topVC)
                 }
             }
             // 2. 更多选项（系统分享）

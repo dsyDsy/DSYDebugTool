@@ -200,7 +200,28 @@ public class DebugFileTransferServer: NSObject {
         return "图片_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).jpg"
     }
     
-    func uploadFile(name: String, data: Data) {
+    
+   public func uploadTextContent(_ text:String,call:((String,Data)->())? = nil){
+        let fileName =  self.textName()
+        let textData = text.data(using: .utf8) ?? Data()
+        log("📝 上传文字内容: \(text)")
+        log("📝 文件名: \(fileName)")
+        log("📝 数据大小: \(textData.count)")
+        uploadFile(name: fileName, data: textData)
+        call?(fileName,textData)
+    }
+    
+    public func uploadImageContent(_ image:UIImage,call:((String,Data)->())? = nil){
+        let fileName =  DebugFileTransferServer.shared.imageName()
+        if  let fileData =  image.jpegData(compressionQuality: 1) {
+            uploadFile(name: fileName, data: fileData )
+        }else{
+            log("📝 数据处理失败")
+        }
+       
+     }
+    
+    public func uploadFile(name: String, data: Data) {
         // 显式复制数据，确保数据不会被意外修改
         let dataCopy = Data(data)
         let fileInfo = (name: name, data: dataCopy, uploadTime: Date())
@@ -208,6 +229,7 @@ public class DebugFileTransferServer: NSObject {
         uploadedFiles.append(fileInfo)
         let indexAfterAppend = uploadedFiles.count - 1
         
+        log("📤 当前队列数据: \(indexBeforeAppend) 个")
         log("📤 文件已上传: \(name)")
         log("📤 原始数据大小: \(data.count) bytes")
         log("📤 复制后数据大小: \(dataCopy.count) bytes")

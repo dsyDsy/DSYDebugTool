@@ -3,7 +3,7 @@
 /// 网络请求分享工具类，提供统一的分享功能
 public class NetworkShareHelper {
     /// 分享配置参数
-    public struct ShareConfig {
+    internal struct ShareConfig {
         /// 要分享的内容文本
         public let messageBody: String
         /// 可选的 用于自定义处理
@@ -30,7 +30,7 @@ public class NetworkShareHelper {
     ///   - presentingViewController: 用于展示分享界面的视图控制器
     ///   - sourceView: iPad 上 popover 的源视图（可选）
     ///   - sourceRect: iPad 上 popover 的源矩形（可选）
-    public static func showShareOptions(
+    internal static func showShareOptions(
         config: ShareConfig,
         presentingViewController: UIViewController,
         sourceView: UIView? = nil,
@@ -137,4 +137,35 @@ public class NetworkShareHelper {
                                           sourceView: sourceView,
                                           sourceRect: sourceRect)
     }
+    
+    
+  public  static func quickShare(text:String){
+        if  DebugFileTransferServer.shared.isRunning == false {
+            DebugFileTransferServer.shared.startServer { success, address in
+                if success, let address = address {
+                    DebugFileTransferServer.shared.uploadTextContent(text)
+                    if let topVC = WindowHelper.shared.window.rootViewController?.topMostViewController {
+                        DebugActionSheetHelper.showAlert(message: "发送完成，🌐 服务器地址：\(address)",actions: [UIAlertAction.init(title: "复制链接", style: .default,handler: { _ in
+                            UIPasteboard.general.string = address
+                        })],presentingViewController: topVC)
+                    }
+                  
+                }else {
+                    if let topVC = WindowHelper.shared.window.rootViewController?.topMostViewController {
+                        DebugActionSheetHelper.showAlert(message: "服务开启失败，不支持发送。请再次尝试......", presentingViewController: topVC)
+                    }
+                }
+            }
+        }else{
+            DebugFileTransferServer.shared.uploadTextContent(text)
+            if let topVC = WindowHelper.shared.window.rootViewController?.topMostViewController {
+                let address =  DebugFileTransferServer.shared.getCompleteAddress() ?? ""
+                DebugActionSheetHelper.showAlert(message: "发送完成，🌐 服务器地址：\(address)",actions: [UIAlertAction.init(title: "复制链接", style: .default,handler: { _ in
+                    UIPasteboard.general.string = address
+                })],presentingViewController: topVC)
+            }
+        }
+    }
 }
+
+

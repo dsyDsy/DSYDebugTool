@@ -231,7 +231,7 @@ public class DebugActionSheetHelper {
     ///   - presentingViewController: 用于展示弹框的视图控制器
     ///   - sourceView: iPad 上 popover 的源视图（可选）
     ///   - sourceRect: iPad 上 popover 的源矩形（可选）
-    static func showAlert(title:String? = nil,
+  public  static func showAlert(title:String? = nil,
                                 message:String?,
                           actions: [UIAlertAction] = [],
                                 style:UIAlertController.Style = .alert,
