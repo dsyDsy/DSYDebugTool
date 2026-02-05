@@ -59,6 +59,7 @@ TODO: Add long description of the pod here.
             ss.frameworks          = 'UIKit', 'Foundation'
             ss.dependency  'ZLImageEditor'
             ss.dependency  'DSYDebugTool/ShareActivity'
+            ss.dependency  'DSYDebugTool/TransferServer'
       end
     
 end

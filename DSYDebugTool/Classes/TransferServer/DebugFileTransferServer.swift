@@ -192,6 +192,14 @@ public class DebugFileTransferServer: NSObject {
         log("📡 GCDWebServer 已停止")
     }
     
+    func textName()->String{
+        return "文字内容_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).txt"
+    }
+    
+    func imageName()->String{
+        return "图片_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).jpg"
+    }
+    
     func uploadFile(name: String, data: Data) {
         // 显式复制数据，确保数据不会被意外修改
         let dataCopy = Data(data)

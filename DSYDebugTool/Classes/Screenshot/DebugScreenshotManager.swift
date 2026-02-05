@@ -14,8 +14,6 @@ public class DebugScreenshotManager {
     private var lastScreenshotImage: UIImage?
     /// 截图缩略图浮层
     private var screenshotPreviewContainer: UIView?
-    
-    public var screenshotHandler:((UIImage)->())?
  
     
     public var isEnableMonitoring:Bool {
@@ -116,20 +114,20 @@ extension DebugScreenshotManager {
             buttonContainer.heightAnchor.constraint(equalToConstant: buttonHeight)
         ])
         
-        let cancelButton = UIButton(type: .system)
-        cancelButton.setTitle("取消", for: .normal)
-        cancelButton.setTitleColor(.black, for: .normal)
-        cancelButton.titleLabel?.font = UIFont.systemFont(ofSize: 14)
-        cancelButton.addTarget(self, action: #selector(screenshotCancelTapped), for: .touchUpInside)
+        let sendButton = UIButton(type: .system)
+        sendButton.setTitle("发送", for: .normal)
+        sendButton.setTitleColor(.green, for: .normal)
+        sendButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 16)
+        sendButton.addTarget(self, action: #selector(screenshotSendTapped), for: .touchUpInside)
         
         let editButton = UIButton(type: .system)
         editButton.setTitle("编辑", for: .normal)
         editButton.setTitleColor(.yellow, for: .normal)
-        editButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
+        editButton.titleLabel?.font = UIFont.systemFont(ofSize: 14)
         editButton.addTarget(self, action: #selector(screenshotEditTapped), for: .touchUpInside)
         
-        buttonContainer.addArrangedSubview(cancelButton)
         buttonContainer.addArrangedSubview(editButton)
+        buttonContainer.addArrangedSubview(sendButton)
         
         window.addSubview(container)
         window.bringSubviewToFront(container)
@@ -159,10 +157,14 @@ extension DebugScreenshotManager {
         }
     }
     
-    /// 点击“取消”按钮
-    @objc private func screenshotCancelTapped() {
+    /// 点击“发送”按钮
+    @objc private func screenshotSendTapped() {
         hideScreenshotPreview()
+        if let image = lastScreenshotImage {
+            self.uploadScreenshot(isSend: true, image: image)
+        }
         lastScreenshotImage = nil
+       
     }
     
     /// 点击“编辑”按钮 -> 进入 ZLImageEditor 编辑
@@ -173,13 +175,6 @@ extension DebugScreenshotManager {
         }
         hideScreenshotPreview()
         
-        let editVC = ZLEditImageViewController(image: image)
-        editVC.modalPresentationStyle = .fullScreen
-        editVC.editFinishBlock = { [weak self] editedImage, _ in
-            guard let self = self else { return }
-            self.screenshotHandler?(editedImage)
-        }
-     
         
         if let topVC =  self.appWindow?.rootViewController?.topMostViewController {
             ZLImageEditorConfiguration.default()
@@ -189,25 +184,108 @@ extension DebugScreenshotManager {
             let h = w * image.zl.height / image.zl.width
             image = image.zl.resize(CGSize(width: w, height: h)) ?? image
             ZLEditImageViewController.showEditImageVC(parentVC: topVC, image: image) { resImage, editModel in
-//                self.screenshotHandler?(resImage)
-                if let topVC =  self.appWindow?.rootViewController?.topMostViewController {
-                    // 2. 更多选项（系统分享）
-                    let moreAction = ActionItem(title: "more", style: .default) {
-                        
-                        
-                    }
-                    DebugActionSheetHelper.show(title: "124",actions: [moreAction], presentingViewController: topVC)
+                self.uploadScreenshot(isSend: false, image: resImage)
+            }
+        }
+    }
+
+    func uploadScreenshot(isSend:Bool,image:UIImage){
+        if isSend {
+            // 使用方式
+            self.saveImage(image) { result in
+                switch result {
+                case .success:
+                    print("保存成功")
+                case .failure(let error):
+                    print("保存失败: \(error.localizedDescription)")
                 }
-                
-            
+            }
+        }
+       
+        if let topVC =  self.appWindow?.rootViewController?.topMostViewController {
+            // 1. 快速分享
+            let fastAction = ActionItem(title: "快速分享", style: .default) {
+                if let fileData = image.jpegData(compressionQuality: 1) {
+                    let fileName =  DebugFileTransferServer.shared.imageName()
+                    if  DebugFileTransferServer.shared.isRunning {
+                        DebugFileTransferServer.shared.uploadFile(name: fileName, data: fileData )
+                        let address = DebugFileTransferServer.shared.getCompleteAddress() ?? ""
+                        DebugActionSheetHelper.showAlert(message: "发送完成，🌐 服务器地址：\(address)",actions: [UIAlertAction.init(title: "复制链接", style: .default,handler: { _ in
+                            UIPasteboard.general.string = address
+                        })],presentingViewController: topVC)
+                    }else{
+                        DebugFileTransferServer.shared.startServer { success, address in
+                            if success, let address = address {
+                                DebugFileTransferServer.shared.uploadFile(name: fileName, data: fileData)
+                                DebugActionSheetHelper.showAlert(message: "发送完成，🌐 服务器地址：\(address)",actions: [UIAlertAction.init(title: "复制链接", style: .default,handler: { _ in
+                                    UIPasteboard.general.string = address
+                                })],presentingViewController: topVC)
+                            }else {
+                                DebugActionSheetHelper.showAlert(message: "服务开启失败，不支持发送。请再次尝试......", presentingViewController: topVC)
+                            }
+                        }
+                    }
+                  
+                }
+            }
+            // 2. 更多选项（系统分享）
+            let moreAction = ActionItem(title: "more", style: .default) {
+                let items: [Any] = [image]
+                let activity = CustomShareActivity.init(title: "快速分享", image: nil) {
+                    fastAction.handler?()
+                }
+                DebugActionSheetHelper.showSystemShare(items: items,activities: [activity], presentingViewController: topVC)
+            }
+            DebugActionSheetHelper.show(actions: [fastAction,moreAction], presentingViewController: topVC)
+        }
+    }
+
+}
+
+import UIKit
+import Photos
+
+extension DebugScreenshotManager {
+    
+    func saveImage(_ image: UIImage, completion: @escaping (Result<Void, Error>) -> Void) {
+        // 检查权限
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        if status == .authorized || status == .limited {
+            saveToPhotoLibrary(image, completion: completion)
+        } else if status == .notDetermined {
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                DispatchQueue.main.async {
+                    if newStatus == .authorized || newStatus == .limited {
+                        self.saveToPhotoLibrary(image, completion: completion)
+                    } else {
+                        completion(.failure(NSError(domain: "PhotoLibrary",
+                                                   code: -1,
+                                                   userInfo: [NSLocalizedDescriptionKey: "相册权限被拒绝"])))
+                    }
+                }
             }
         } else {
-            // 找不到可展示控制器时直接处理编辑结果为原图
-            self.screenshotHandler?(image)
+            completion(.failure(NSError(domain: "PhotoLibrary",
+                                       code: -1,
+                                       userInfo: [NSLocalizedDescriptionKey: "没有相册权限"])))
         }
     }
     
-    
+    private  func saveToPhotoLibrary(_ image: UIImage, completion: @escaping (Result<Void, Error>) -> Void) {
+        PHPhotoLibrary.shared().performChanges({
+            // 创建保存请求
+            PHAssetChangeRequest.creationRequestForAsset(from: image)
+        }) { success, error in
+            DispatchQueue.main.async {
+                if success {
+                    completion(.success(()))
+                } else if let error = error {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
 }
 
 
@@ -230,3 +308,5 @@ extension UIViewController {
         return self
     }
 }
+
+

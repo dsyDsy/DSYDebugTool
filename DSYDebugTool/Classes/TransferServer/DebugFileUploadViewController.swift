@@ -263,7 +263,7 @@ public class DebugFileUploadViewController: UIViewController, UIImagePickerContr
     }
     
     public static  func uploadTextContent(_ text: String) {
-        let fileName = "文字内容_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).txt"
+        let fileName =  DebugFileTransferServer.shared.textName()
         let textData = text.data(using: .utf8) ?? Data()
         
          DebugFileTransferServer.shared.log("web_test📝 上传文字内容: \(text)")
@@ -306,7 +306,7 @@ public class DebugFileUploadViewController: UIViewController, UIImagePickerContr
             
             // 处理图片
             if let image = info[.originalImage] as? UIImage {
-                fileName = "图片_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).jpg"
+                fileName = DebugFileTransferServer.shared.imageName()
                 fileData = image.jpegData(compressionQuality: 0.8)
                  DebugFileTransferServer.shared.log("web_test📷 处理图片: \(fileName), 原始尺寸: \(image.size), 数据大小: \(fileData?.count ?? 0) bytes")
             }

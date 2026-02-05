@@ -220,6 +220,47 @@ public class DebugActionSheetHelper {
         
         presentingViewController.present(activityVC, animated: true, completion: nil)
     }
+    
+    
+    /// 系统弹框
+    /// - Parameters:
+    ///   - title: 标题
+    ///   - message: 文案
+    ///   - actions: 按钮组
+    ///   - style: 样式
+    ///   - presentingViewController: 用于展示弹框的视图控制器
+    ///   - sourceView: iPad 上 popover 的源视图（可选）
+    ///   - sourceRect: iPad 上 popover 的源矩形（可选）
+    static func showAlert(title:String? = nil,
+                                message:String?,
+                          actions: [UIAlertAction] = [],
+                                style:UIAlertController.Style = .alert,
+                         presentingViewController: UIViewController,
+                         sourceView: UIView? = nil,
+                                sourceRect: CGRect? = nil){
+        let activityVC = UIAlertController.init(title: title, message: message, preferredStyle: .alert)
+        var actions = actions
+        if actions.count == 0 || actions.first(where: {$0.style == .cancel}) == nil  {
+            actions.append(UIAlertAction.init(title: "确定", style: .cancel))
+        }
+        actions.forEach { a in
+            activityVC.addAction(a)
+        }
+        // 配置 popover（iPad）
+        if  UIDevice.current.userInterfaceIdiom == .pad {
+            if let sourceView = sourceView ?? presentingViewController.view {
+                activityVC.popoverPresentationController?.sourceView = sourceView
+                activityVC.popoverPresentationController?.sourceRect = sourceRect ?? CGRect(
+                    x: sourceView.bounds.midX,
+                    y: sourceView.bounds.midY,
+                    width: 0,
+                    height: 0
+                )
+            }
+        }
+        presentingViewController.present(activityVC, animated: true, completion: nil)
+    }
+    
     /// 创建邮件 composer
     private static func createMailComposer(
         config: EmailConfig,
