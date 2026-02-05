@@ -10,10 +10,12 @@ import UIKit
 public class DebugScreenshotManager {
     public  static let shared = DebugScreenshotManager()
     public weak var appWindow:UIWindow?
+    /// 自动隐藏事件
+    public  var autoHideTime:Double = 8
     /// 最近一次截图的原始图片
     private var lastScreenshotImage: UIImage?
     /// 截图缩略图浮层
-    private var screenshotPreviewContainer: UIView?
+    private var screenshotPreviewContainer: DebugScreenshotContentView?
  
     
     public var isEnableMonitoring:Bool {
@@ -82,7 +84,14 @@ extension DebugScreenshotManager {
             height: containerHeight
         )
         
-        let container = UIView(frame: frame)
+        let container = DebugScreenshotContentView(frame: frame)
+        container.config.hideThreshold = 0.3 // 30%
+        container.config.supportedDirections = [.left, .right,.up,.down] // 只支持左右滑动
+        // 回调
+        container.onHide = { [weak self] direction in
+            print("视图隐藏，方向: \(direction)")
+            self?.hideScreenshotPreview()
+        }
         container.backgroundColor = UIColor.white.withAlphaComponent(0.6)
         container.layer.cornerRadius = 6
         container.clipsToBounds = true
@@ -137,15 +146,12 @@ extension DebugScreenshotManager {
         window.bringSubviewToFront(container)
         screenshotPreviewContainer = container
        
-        // 简单出现动画
+//        // 简单出现动画
         container.transform = CGAffineTransform(translationX: 0, y: 40)
-        UIView.animate(withDuration: 0.25) {
-            container.alpha = 1
-            container.transform = .identity
-        }
+        container.show()
         
         // 若一段时间内未操作，自动隐藏
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + autoHideTime) { [weak self] in
             self?.hideScreenshotPreview()
         }
     }
