@@ -10,45 +10,6 @@ import Foundation
 import UIKit
 import MessageUI
 
-/// 自定义 UIActivity，用于在 UIActivityViewController 中提供自定义分享入口
-class CustomNetworkShareActivity: UIActivity {
-    
-    var title: String
-    var image: UIImage?
-    var handler: (() -> Void)?
-    
-    init(title: String, image: UIImage? = nil, handler: @escaping () -> Void) {
-        self.title = title
-        self.image = image
-        self.handler = handler
-        super.init()
-    }
-    
-    override var activityTitle: String? {
-        return title
-    }
-    
-    override var activityImage: UIImage? {
-        return image ?? UIImage(systemName: "square.and.arrow.up")
-    }
-    
-    override var activityType: UIActivity.ActivityType? {
-        return UIActivity.ActivityType("com.cocoadebug.customNetworkShare")
-    }
-    
-    override class var activityCategory: UIActivity.Category {
-        return .action
-    }
-    
-    override func canPerform(withActivityItems activityItems: [Any]) -> Bool {
-        return true
-    }
-    
-    override func perform() {
-        handler?()
-        activityDidFinish(true)
-    }
-}
 
 class NetworkDetailViewController: UITableViewController, MFMailComposeViewControllerDelegate {
     
@@ -221,7 +182,7 @@ class NetworkDetailViewController: UITableViewController, MFMailComposeViewContr
     
     
     //email configure
-    func configureMailComposer(_ copy: Bool = false) -> MFMailComposeViewController? {
+    func configureMailComposer(_ copy: Bool = false) -> UIImage? {
         
         //1.image
         var img: UIImage? = nil
@@ -295,51 +256,51 @@ class NetworkDetailViewController: UITableViewController, MFMailComposeViewContr
         
         //////////////////////////////////////////////////////////////////////////////////
         
-        if !MFMailComposeViewController.canSendMail() {
-            if copy == false {
-                //share via email
-                let alert = UIAlertController.init(title: "No Mail Accounts", message: "Please set up a Mail account in order to send email.", preferredStyle: .alert)
-                let action = UIAlertAction.init(title: "OK", style: .cancel) { _ in
-                }
-                alert.addAction(action)
-                
-                alert.popoverPresentationController?.permittedArrowDirections = .init(rawValue: 0)
-                alert.popoverPresentationController?.sourceView = self.view
-                alert.popoverPresentationController?.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
-                
-                self.present(alert, animated: true, completion: nil)
-            } else {
-                //copy to clipboard
-            }
-            
-            return nil
-        }
+//        if !MFMailComposeViewController.canSendMail() {
+//            if copy == false {
+//                //share via email
+//                let alert = UIAlertController.init(title: "No Mail Accounts", message: "Please set up a Mail account in order to send email.", preferredStyle: .alert)
+//                let action = UIAlertAction.init(title: "OK", style: .cancel) { _ in
+//                }
+//                alert.addAction(action)
+//                
+//                alert.popoverPresentationController?.permittedArrowDirections = .init(rawValue: 0)
+//                alert.popoverPresentationController?.sourceView = self.view
+//                alert.popoverPresentationController?.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
+//                
+//                self.present(alert, animated: true, completion: nil)
+//            } else {
+//                //copy to clipboard
+//            }
+//            
+//            return nil
+//        }
         
         if copy == true {
             //copy to clipboard
             return nil
         }
         
-        //3.email recipients
-        let mailComposeVC = MFMailComposeViewController()
-        mailComposeVC.mailComposeDelegate = self
-        mailComposeVC.setToRecipients(CocoaDebugSettings.shared.emailToRecipients)
-        mailComposeVC.setCcRecipients(CocoaDebugSettings.shared.emailCcRecipients)
+//        //3.email recipients
+//        let mailComposeVC = MFMailComposeViewController()
+//        mailComposeVC.mailComposeDelegate = self
+//        mailComposeVC.setToRecipients(CocoaDebugSettings.shared.emailToRecipients)
+//        mailComposeVC.setCcRecipients(CocoaDebugSettings.shared.emailCcRecipients)
+//        
+//        //4.image
+//        if let img = img {
+//            if let imageData = img.pngData() {
+//                mailComposeVC.addAttachmentData(imageData, mimeType: "image/png", fileName: "image")
+//            }
+//        }
+//        
+//        //5.body
+//        mailComposeVC.setMessageBody(messageBody, isHTML: false)
+//        
+//        //6.subject
+//        mailComposeVC.setSubject(url)
         
-        //4.image
-        if let img = img {
-            if let imageData = img.pngData() {
-                mailComposeVC.addAttachmentData(imageData, mimeType: "image/png", fileName: "image")
-            }
-        }
-        
-        //5.body
-        mailComposeVC.setMessageBody(messageBody, isHTML: false)
-        
-        //6.subject
-        mailComposeVC.setSubject(url)
-        
-        return mailComposeVC
+        return img
     }
     
     
@@ -399,79 +360,87 @@ class NetworkDetailViewController: UITableViewController, MFMailComposeViewContr
     }
     
     @IBAction func didTapMail(_ sender: UIBarButtonItem) {
-        
-        // create an actionSheet
-        let alert: UIAlertController = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        
-        // create an action
-       
-        if  let  customNetworkShareHandler = CocoaDebugSettings.shared.customNetworkShareHandler {
-            let  quickAction: UIAlertAction = UIAlertAction(title: CocoaDebugSettings.shared.customNetworkShareTitle, style: .default) { [weak self] action -> Void in
-                guard let self = self else { return }
-                _ = self.configureMailComposer(true)
-                customNetworkShareHandler(self.messageBody, self.httpModel)
-            }
-            alert.addAction(quickAction)
-         
-        }
-       
-        if  CocoaDebugSettings.shared.emailToRecipients?.count ?? 0 > 0 && CocoaDebugSettings.shared.emailToRecipients?.first?.count  ?? 0 > 0 {
-            let firstAction: UIAlertAction = UIAlertAction(title: "share via email", style: .default) { [weak self] action -> Void in
-                if let mailComposeViewController = self?.configureMailComposer() {
-                    self?.present(mailComposeViewController, animated: true, completion: nil)
-                }
-            }
-            alert.addAction(firstAction)
-        }
-        
-        let secondAction: UIAlertAction = UIAlertAction(title: "copy to clipboard", style: .default) { [weak self] action -> Void in
-            _ = self?.configureMailComposer(true)
-            UIPasteboard.general.string = self?.messageBody
-        }
-        alert.addAction(secondAction)
-        
-        let moreAction: UIAlertAction = UIAlertAction(title: "more", style: .default) { [weak self] action -> Void in
-            guard let self = self else { return }
-            _ = self.configureMailComposer(true)
-            let items: [Any] = [self.messageBody ?? ""]
-            
-            // 创建自定义 activity 数组
-            var applicationActivities: [UIActivity] = []
-            
-            // 如果设置了自定义处理回调，创建自定义 activity 并放在第一位
-            let settings = CocoaDebugSettings.shared
-            if let customHandler = settings.customNetworkShareHandler {
-                let customActivity = CustomNetworkShareActivity(
-                    title: settings.customNetworkShareTitle,
-                    image: settings.customNetworkShareImage,
-                    handler: {
-                        customHandler(self.messageBody, self.httpModel)
-                    }
-                )
-                applicationActivities.append(customActivity)
-            }
-            
-            let activityVC = UIActivityViewController(activityItems: items, applicationActivities: applicationActivities.isEmpty ? nil : applicationActivities)
-            
-            if UI_USER_INTERFACE_IDIOM() == .phone {
-                self.present(activityVC, animated: true, completion: nil)
-            } else {
-                activityVC.popoverPresentationController?.sourceRect = .init(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
-                activityVC.popoverPresentationController?.sourceView = self.view
-                self.present(activityVC, animated: true, completion: nil)
-            }
-
-        }
+        let img = self.configureMailComposer(true)
+      
+        let config = NetworkShareHelper.ShareConfig(messageBody: self.messageBody,
+                                                    httpModel: self.httpModel,
+                                                    image:img,
+                                                    emailSubject: nil)
     
-        alert.addAction(moreAction)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
-        alert.popoverPresentationController?.permittedArrowDirections = .init(rawValue: 0)
-        alert.popoverPresentationController?.sourceView = self.view
-        alert.popoverPresentationController?.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
-        
-        // present an actionSheet...
-        present(alert, animated: true, completion: nil)
+        NetworkShareHelper.showShareOptions(config: config, presentingViewController: self)
+//        return;
+//        // create an actionSheet
+//        let alert: UIAlertController = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+//        
+//        // create an action
+//       
+//        if  let  customNetworkShareHandler = CocoaDebugSettings.shared.customNetworkShareHandler {
+//            let  quickAction: UIAlertAction = UIAlertAction(title: CocoaDebugSettings.shared.customNetworkShareTitle, style: .default) { [weak self] action -> Void in
+//                guard let self = self else { return }
+//                _ = self.configureMailComposer(true)
+//                customNetworkShareHandler(self.messageBody, self.httpModel)
+//            }
+//            alert.addAction(quickAction)
+//         
+//        }
+//       
+//        if  CocoaDebugSettings.shared.emailToRecipients?.count ?? 0 > 0 && CocoaDebugSettings.shared.emailToRecipients?.first?.count  ?? 0 > 0 {
+//            let firstAction: UIAlertAction = UIAlertAction(title: "share via email", style: .default) { [weak self] action -> Void in
+//                if let mailComposeViewController = self?.configureMailComposer() {
+//                    self?.present(mailComposeViewController, animated: true, completion: nil)
+//                }
+//            }
+//            alert.addAction(firstAction)
+//        }
+//        
+//        let secondAction: UIAlertAction = UIAlertAction(title: "copy to clipboard", style: .default) { [weak self] action -> Void in
+//            _ = self?.configureMailComposer(true)
+//            UIPasteboard.general.string = self?.messageBody
+//        }
+//        alert.addAction(secondAction)
+//        
+//        let moreAction: UIAlertAction = UIAlertAction(title: "more", style: .default) { [weak self] action -> Void in
+//            guard let self = self else { return }
+//            _ = self.configureMailComposer(true)
+//            let items: [Any] = [self.messageBody ?? ""]
+//            
+//            // 创建自定义 activity 数组
+//            var applicationActivities: [UIActivity] = []
+//            
+//            // 如果设置了自定义处理回调，创建自定义 activity 并放在第一位
+//            let settings = CocoaDebugSettings.shared
+//            if let customHandler = settings.customNetworkShareHandler {
+//                let customActivity = CustomNetworkShareActivity(
+//                    title: settings.customNetworkShareTitle,
+//                    image: settings.customNetworkShareImage,
+//                    handler: {
+//                        customHandler(self.messageBody, self.httpModel)
+//                    }
+//                )
+//                applicationActivities.append(customActivity)
+//            }
+//            
+//            let activityVC = UIActivityViewController(activityItems: items, applicationActivities: applicationActivities.isEmpty ? nil : applicationActivities)
+//            
+//            if UI_USER_INTERFACE_IDIOM() == .phone {
+//                self.present(activityVC, animated: true, completion: nil)
+//            } else {
+//                activityVC.popoverPresentationController?.sourceRect = .init(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
+//                activityVC.popoverPresentationController?.sourceView = self.view
+//                self.present(activityVC, animated: true, completion: nil)
+//            }
+//
+//        }
+//    
+//        alert.addAction(moreAction)
+//        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+//        
+//        alert.popoverPresentationController?.permittedArrowDirections = .init(rawValue: 0)
+//        alert.popoverPresentationController?.sourceView = self.view
+//        alert.popoverPresentationController?.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
+//        
+//        // present an actionSheet...
+//        present(alert, animated: true, completion: nil)
     }
 }
 

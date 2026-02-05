@@ -16,6 +16,13 @@ TODO: Add long description of the pod here.
   
   s.ios.deployment_target = '13.0'
   
+  
+  s.subspec 'ShareActivity' do |ss|
+          ss.source_files        = "DSYDebugTool/Classes/ShareActivity", "DSYDebugTool/Classes/ShareActivity/**/*.{h,m,mm,swift,c}"
+          ss.resources           = "DSYDebugTool/Classes/ShareActivity/**/*.{png,xib,storyboard}"
+          ss.frameworks          = 'UIKit', 'Foundation'
+    end
+  
   # 基于CocoaDebug改动 原项目地址 https://github.com/CocoaDebug/CocoaDebug
   s.subspec 'CocoaDebug' do |ss|
     ss.requires_arc        = false
@@ -36,6 +43,7 @@ TODO: Add long description of the pod here.
         ss.public_header_files = "DSYDebugTool/Classes/CocoaDebug/**/*.h"
         ss.resources           = "DSYDebugTool/Classes/CocoaDebug/**/*.{png,xib,storyboard}"
         ss.frameworks          = 'UIKit', 'Foundation', 'JavaScriptCore', 'QuickLook'
+        ss.dependency  'DSYDebugTool/ShareActivity'
   end
   
     s.subspec 'TransferServer' do |ss|
