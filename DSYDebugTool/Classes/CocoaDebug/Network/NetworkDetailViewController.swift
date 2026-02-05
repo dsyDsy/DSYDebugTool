@@ -363,84 +363,12 @@ class NetworkDetailViewController: UITableViewController, MFMailComposeViewContr
         let img = self.configureMailComposer(true)
       
         let config = NetworkShareHelper.ShareConfig(messageBody: self.messageBody,
-                                                    httpModel: self.httpModel,
+                                                    data: self.httpModel,
                                                     image:img,
                                                     emailSubject: nil)
     
         NetworkShareHelper.showShareOptions(config: config, presentingViewController: self)
-//        return;
-//        // create an actionSheet
-//        let alert: UIAlertController = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-//        
-//        // create an action
-//       
-//        if  let  customNetworkShareHandler = CocoaDebugSettings.shared.customNetworkShareHandler {
-//            let  quickAction: UIAlertAction = UIAlertAction(title: CocoaDebugSettings.shared.customNetworkShareTitle, style: .default) { [weak self] action -> Void in
-//                guard let self = self else { return }
-//                _ = self.configureMailComposer(true)
-//                customNetworkShareHandler(self.messageBody, self.httpModel)
-//            }
-//            alert.addAction(quickAction)
-//         
-//        }
-//       
-//        if  CocoaDebugSettings.shared.emailToRecipients?.count ?? 0 > 0 && CocoaDebugSettings.shared.emailToRecipients?.first?.count  ?? 0 > 0 {
-//            let firstAction: UIAlertAction = UIAlertAction(title: "share via email", style: .default) { [weak self] action -> Void in
-//                if let mailComposeViewController = self?.configureMailComposer() {
-//                    self?.present(mailComposeViewController, animated: true, completion: nil)
-//                }
-//            }
-//            alert.addAction(firstAction)
-//        }
-//        
-//        let secondAction: UIAlertAction = UIAlertAction(title: "copy to clipboard", style: .default) { [weak self] action -> Void in
-//            _ = self?.configureMailComposer(true)
-//            UIPasteboard.general.string = self?.messageBody
-//        }
-//        alert.addAction(secondAction)
-//        
-//        let moreAction: UIAlertAction = UIAlertAction(title: "more", style: .default) { [weak self] action -> Void in
-//            guard let self = self else { return }
-//            _ = self.configureMailComposer(true)
-//            let items: [Any] = [self.messageBody ?? ""]
-//            
-//            // 创建自定义 activity 数组
-//            var applicationActivities: [UIActivity] = []
-//            
-//            // 如果设置了自定义处理回调，创建自定义 activity 并放在第一位
-//            let settings = CocoaDebugSettings.shared
-//            if let customHandler = settings.customNetworkShareHandler {
-//                let customActivity = CustomNetworkShareActivity(
-//                    title: settings.customNetworkShareTitle,
-//                    image: settings.customNetworkShareImage,
-//                    handler: {
-//                        customHandler(self.messageBody, self.httpModel)
-//                    }
-//                )
-//                applicationActivities.append(customActivity)
-//            }
-//            
-//            let activityVC = UIActivityViewController(activityItems: items, applicationActivities: applicationActivities.isEmpty ? nil : applicationActivities)
-//            
-//            if UI_USER_INTERFACE_IDIOM() == .phone {
-//                self.present(activityVC, animated: true, completion: nil)
-//            } else {
-//                activityVC.popoverPresentationController?.sourceRect = .init(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
-//                activityVC.popoverPresentationController?.sourceView = self.view
-//                self.present(activityVC, animated: true, completion: nil)
-//            }
-//
-//        }
-//    
-//        alert.addAction(moreAction)
-//        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-//        
-//        alert.popoverPresentationController?.permittedArrowDirections = .init(rawValue: 0)
-//        alert.popoverPresentationController?.sourceView = self.view
-//        alert.popoverPresentationController?.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
-//        
-//        // present an actionSheet...
-//        present(alert, animated: true, completion: nil)
+
     }
 }
 

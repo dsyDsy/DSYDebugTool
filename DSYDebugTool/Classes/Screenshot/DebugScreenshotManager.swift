@@ -189,7 +189,17 @@ extension DebugScreenshotManager {
             let h = w * image.zl.height / image.zl.width
             image = image.zl.resize(CGSize(width: w, height: h)) ?? image
             ZLEditImageViewController.showEditImageVC(parentVC: topVC, image: image) { resImage, editModel in
-                self.screenshotHandler?(resImage)
+//                self.screenshotHandler?(resImage)
+                if let topVC =  self.appWindow?.rootViewController?.topMostViewController {
+                    // 2. 更多选项（系统分享）
+                    let moreAction = ActionItem(title: "more", style: .default) {
+                        
+                        
+                    }
+                    DebugActionSheetHelper.show(title: "124",actions: [moreAction], presentingViewController: topVC)
+                }
+                
+            
             }
         } else {
             // 找不到可展示控制器时直接处理编辑结果为原图

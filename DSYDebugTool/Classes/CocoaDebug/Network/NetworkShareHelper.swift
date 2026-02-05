@@ -2,24 +2,23 @@
 
 /// 网络请求分享工具类，提供统一的分享功能
 public class NetworkShareHelper {
-    
     /// 分享配置参数
     public struct ShareConfig {
         /// 要分享的内容文本
         public let messageBody: String
-        /// 可选的 HTTP 模型，用于自定义处理
-        public let httpModel: Any?
+        /// 可选的 用于自定义处理
+        public let data: Any?
         /// 可选的图片附件
         public let image: UIImage?
         /// 邮件主题（如果使用邮件分享）
         public let emailSubject: String?
         
         public init(messageBody: String,
-                   httpModel: Any? = nil,
+                    data: Any? = nil,
                    image: UIImage? = nil,
                    emailSubject: String? = nil) {
             self.messageBody = messageBody
-            self.httpModel = httpModel
+            self.data = data
             self.image = image
             self.emailSubject = emailSubject
         }
@@ -46,7 +45,7 @@ public class NetworkShareHelper {
                 title: CocoaDebugSettings.shared.customNetworkShareTitle,
                 style: .default
             ) {
-                customNetworkShareHandler(config.messageBody, config.httpModel as? _HttpModel)
+                customNetworkShareHandler(config.messageBody, config.data as? _HttpModel)
             }
             customActions.append(quickAction)
         }
@@ -74,7 +73,7 @@ public class NetworkShareHelper {
             }
             
             let subject = config.emailSubject ?? {
-                if let httpModel = config.httpModel as? _HttpModel,
+                if let httpModel = config.data as? _HttpModel,
                    let url = httpModel.url {
                     return url.absoluteString
                 }
@@ -91,7 +90,7 @@ public class NetworkShareHelper {
         }
         
         // 4. 使用 ActionSheetHelper 展示弹框
-        ActionSheetHelper.show(
+        DebugActionSheetHelper.show(
             actions: customActions,
             emailConfig: emailConfig,
             includeCopyAction: true,
@@ -117,7 +116,7 @@ public class NetworkShareHelper {
         }
         
         // 创建自定义 activity 数组
-        var applicationActivities: [UIActivity] = []
+        var applicationActivities: [CustomShareActivity] = []
         
         // 如果设置了自定义处理回调，创建自定义 activity
         let settings = CocoaDebugSettings.shared
@@ -126,29 +125,16 @@ public class NetworkShareHelper {
                 title: settings.customNetworkShareTitle,
                 image: settings.customNetworkShareImage,
                 handler: {
-                    customHandler(config.messageBody, config.httpModel as? _HttpModel)
+                    customHandler(config.messageBody, config.data as? _HttpModel)
                 }
             )
             applicationActivities.append(customActivity)
         }
         
-        let activityVC = UIActivityViewController(
-            activityItems: items,
-            applicationActivities: applicationActivities.isEmpty ? nil : applicationActivities
-        )
-        // 配置 popover（iPad）
-        if  UIDevice.current.userInterfaceIdiom == .pad {
-            if let sourceView = sourceView ?? presentingViewController.view {
-                activityVC.popoverPresentationController?.sourceView = sourceView
-                activityVC.popoverPresentationController?.sourceRect = sourceRect ?? CGRect(
-                    x: sourceView.bounds.midX,
-                    y: sourceView.bounds.midY,
-                    width: 0,
-                    height: 0
-                )
-            }
-        }
-        
-        presentingViewController.present(activityVC, animated: true, completion: nil)
+        DebugActionSheetHelper.showSystemShare(items: items,
+                                          activities: applicationActivities,
+                                          presentingViewController: presentingViewController,
+                                          sourceView: sourceView,
+                                          sourceRect: sourceRect)
     }
 }

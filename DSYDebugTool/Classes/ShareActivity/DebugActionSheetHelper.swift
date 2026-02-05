@@ -1,5 +1,5 @@
 //
-//  ActionSheetHelper.swift
+//  DebugActionSheetHelper.swift
 //  DSYDebugTool
 //
 //  Created by code on 2025/01/XX.
@@ -64,9 +64,51 @@ public protocol ActionSheetMailDelegate: AnyObject {
     func mailComposeController(_ controller: MFMailComposeViewController, didFinishWith result: MFMailComposeResult, error: Error?)
 }
 
+/// 自定义 UIActivity，用于在 UIActivityViewController 中提供自定义分享入口
+public class CustomShareActivity: UIActivity {
+    
+    var title: String
+    var image: UIImage?
+    var handler: (() -> Void)?
+    
+    init(title: String, image: UIImage? = nil, handler: @escaping () -> Void) {
+        self.title = title
+        self.image = image
+        self.handler = handler
+        super.init()
+    }
+    
+    public override var activityTitle: String? {
+        return title
+    }
+    
+    public override var activityImage: UIImage? {
+        return image ?? UIImage(systemName: "square.and.arrow.up")
+    }
+    
+    public override var activityType: UIActivity.ActivityType? {
+        return UIActivity.ActivityType("com.cocoadebug.customNetworkShare")
+    }
+    
+    public override class var activityCategory: UIActivity.Category {
+        return .action
+    }
+    
+    public  override func canPerform(withActivityItems activityItems: [Any]) -> Bool {
+        return true
+    }
+    
+    public override func perform() {
+        handler?()
+        activityDidFinish(true)
+    }
+}
+
+
+
 /// 通用的操作弹框工具类
 /// 支持动态添加多个自定义操作项，以及邮件分享功能
-public class ActionSheetHelper {
+public class DebugActionSheetHelper {
     
     /// 展示操作弹框
     /// - Parameters:
@@ -146,6 +188,38 @@ public class ActionSheetHelper {
         presentingViewController.present(alert, animated: true, completion: nil)
     }
     
+    /// 展示系统分享
+    /// - Parameters:
+    ///   - items: 分享内容
+    ///   - activities: 自定义分享按钮
+    ///   - presentingViewController: 用于展示弹框的视图控制器
+    ///   - sourceView: iPad 上 popover 的源视图（可选）
+    ///   - sourceRect: iPad 上 popover 的源矩形（可选）
+    public static func showSystemShare(items:[Any],
+                         activities:[CustomShareActivity]? = nil,
+                         presentingViewController: UIViewController,
+                         sourceView: UIView? = nil,
+                         sourceRect: CGRect? = nil){
+        
+        let activityVC = UIActivityViewController(
+            activityItems: items,
+            applicationActivities: activities
+        )
+        // 配置 popover（iPad）
+        if  UIDevice.current.userInterfaceIdiom == .pad {
+            if let sourceView = sourceView ?? presentingViewController.view {
+                activityVC.popoverPresentationController?.sourceView = sourceView
+                activityVC.popoverPresentationController?.sourceRect = sourceRect ?? CGRect(
+                    x: sourceView.bounds.midX,
+                    y: sourceView.bounds.midY,
+                    width: 0,
+                    height: 0
+                )
+            }
+        }
+        
+        presentingViewController.present(activityVC, animated: true, completion: nil)
+    }
     /// 创建邮件 composer
     private static func createMailComposer(
         config: EmailConfig,

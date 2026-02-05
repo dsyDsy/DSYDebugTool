@@ -58,6 +58,7 @@ TODO: Add long description of the pod here.
             ss.resources           = "DSYDebugTool/Classes/Screenshot/**/*.{png,xib,storyboard}"
             ss.frameworks          = 'UIKit', 'Foundation'
             ss.dependency  'ZLImageEditor'
+            ss.dependency  'DSYDebugTool/ShareActivity'
       end
     
 end
