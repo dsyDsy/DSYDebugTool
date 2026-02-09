@@ -21,16 +21,15 @@ public class DebugScreenshotManager {
     
     public var isEnableSystemMonitoring:Bool {
         get{
-            if UserDefaults.standard.value(forKey: "debug_open_didTakeScreenshot") == nil {
-                return false /// 默认不开启
-            }
-            return UserDefaults.standard.bool(forKey: "debug_open_didTakeScreenshot")
+            return DebugKeychainManager.load("debug_open_didTakeScreenshot") == "1"
         }
         set{
-            UserDefaults.standard.set(newValue, forKey: "debug_open_didTakeScreenshot")
-            UserDefaults.standard.synchronize()
+            if newValue == true {
+                DebugKeychainManager.save("1", forKey: "debug_open_didTakeScreenshot")
+            }else{
+                DebugKeychainManager.save("0", forKey: "debug_open_didTakeScreenshot")
+            }
         }
-       
     }
     
     private  var appWindow:UIWindow?{
