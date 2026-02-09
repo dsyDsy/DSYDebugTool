@@ -16,6 +16,11 @@ TODO: Add long description of the pod here.
   
   s.ios.deployment_target = '13.0'
   
+#    s.subspec 'Common' do |ss|
+#            ss.source_files        = "DSYDebugTool/Classes/Common", "DSYDebugTool/Classes/Common/**/*.{h,m,mm,swift,c}"
+#            ss.resources           = "DSYDebugTool/Classes/Common/**/*.{png,xib,storyboard}"
+#            ss.frameworks          = 'UIKit', 'Foundation'
+#    end
   
     s.subspec 'ShareActivity' do |ss|
             ss.source_files        = "DSYDebugTool/Classes/ShareActivity", "DSYDebugTool/Classes/ShareActivity/**/*.{h,m,mm,swift,c}"

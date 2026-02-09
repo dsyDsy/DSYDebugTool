@@ -126,10 +126,18 @@ class Bubble: UIView {
         applySettings()
         
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(Bubble.tap))
+        tapGesture.numberOfTapsRequired = 1
         self.addGestureRecognizer(tapGesture)
         
         let longTap = UILongPressGestureRecognizer.init(target: self, action: #selector(Bubble.longTap))
+        longTap.minimumPressDuration = 0.5
         self.addGestureRecognizer(longTap)
+        
+        let doubleGesture = UITapGestureRecognizer(target: self, action: #selector(Bubble.doubletap))
+        doubleGesture.numberOfTapsRequired = 2
+        self.addGestureRecognizer(doubleGesture)
+        tapGesture.require(toFail: doubleGesture)
+
     }
 
     fileprivate func  applySettings() {
@@ -255,12 +263,12 @@ class Bubble: UIView {
         self.networkNumber = 0
         
         self.numberLabel?.text = String(networkNumber)
-        
-        if self.networkNumber == 0 {
-            self.numberLabel?.isHidden = true
-        } else {
-            self.numberLabel?.isHidden = false
-        }
+        self.numberLabel?.isHidden = false
+//        if self.networkNumber == 0 {
+//            self.numberLabel?.isHidden = true
+//        } else {
+//            self.numberLabel?.isHidden = false
+//        }
     }
     
     @objc func show_cocoadebug_force() {
@@ -278,6 +286,10 @@ class Bubble: UIView {
         _HttpDatasource.shared().reset()
         CocoaDebugSettings.shared.networkLastIndex = 0
         NotificationCenter.default.post(name: NSNotification.Name("deleteAllLogs_CocoaDebug"), object: nil, userInfo: nil)
+    }
+    //MARK: - target action
+    @objc func doubletap() {
+            NotificationCenter.default.post(name: NSNotification.Name(rawValue: "DebugScreenshotManager_screenshotName"), object: nil, userInfo: nil)
     }
     
     @objc func panDidFire(panner: UIPanGestureRecognizer) {

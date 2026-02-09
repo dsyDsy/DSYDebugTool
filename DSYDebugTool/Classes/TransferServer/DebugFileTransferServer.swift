@@ -15,7 +15,7 @@ public class DebugFileTransferServer: NSObject {
     public var serverPort: UInt = 8080
     
     /// Debug 开关，控制是否输出日志
-    public var isDebugEnabled: Bool = true
+    public var isDebugLogEnabled: Bool = true
     
     /// 端口被占用时，自动顺延尝试的次数（例如 20 表示最多尝试 `serverPort...serverPort+20`）
     public var portAutoRetryCount: UInt = 20
@@ -36,7 +36,7 @@ public class DebugFileTransferServer: NSObject {
                     file : StaticString = #file,
                     method: StaticString = #function,
                     lineNumber : UInt = #line) {
-        guard isDebugEnabled else { return }
+        guard isDebugLogEnabled else { return }
         print("[文件传输助手][\((file.description as NSString).lastPathComponent): \(method) line:\(lineNumber)]---> \(message)")
     }
     

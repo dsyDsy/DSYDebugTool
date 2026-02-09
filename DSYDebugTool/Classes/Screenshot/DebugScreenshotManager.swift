@@ -19,10 +19,10 @@ public class DebugScreenshotManager {
     private var screenshotPreviewContainer: DebugScreenshotContentView?
  
     
-    public var isEnableMonitoring:Bool {
+    public var isEnableSystemMonitoring:Bool {
         get{
             if UserDefaults.standard.value(forKey: "debug_open_didTakeScreenshot") == nil {
-                return true /// 默认开启
+                return false /// 默认不开启
             }
             return UserDefaults.standard.bool(forKey: "debug_open_didTakeScreenshot")
         }
@@ -38,15 +38,21 @@ public class DebugScreenshotManager {
     }
     
     init() {
-        NotificationCenter.default.addObserver(self, selector: #selector(handleScreenDidChange), name: UIApplication.userDidTakeScreenshotNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleSystemScreenDidChange), name: UIApplication.userDidTakeScreenshotNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleScreenDidChange), name: NSNotification.Name(rawValue: "DebugScreenshotManager_screenshotName"), object: nil)
     }
     
     public func didScreenshot(){
        self.handleScreenDidChange(notification: NSNotification(name: UIApplication.userDidTakeScreenshotNotification, object: nil))
     }
     
+    @objc   func handleSystemScreenDidChange(notification: NSNotification) {
+        guard isEnableSystemMonitoring == true else {return}
+        self.handleScreenDidChange(notification: notification)
+    }
+    
     @objc   func handleScreenDidChange(notification: NSNotification) {
-        guard isEnableMonitoring == true,let appWindow = appWindow else { return }
+        guard let appWindow = appWindow else { return }
         // 确保在主线程执行截屏与 UI 操作
         DispatchQueue.main.async {
             // 使用 UIGraphicsImageRenderer 截取当前窗口内容，稳定性更好
@@ -85,7 +91,7 @@ extension DebugScreenshotManager {
         let frame = CGRect(
             // 右上角：考虑 safeAreaInsets
             x: window.bounds.width - containerWidth - 16 - window.safeAreaInsets.right,
-            y: window.safeAreaInsets.top + 40,
+            y: window.bounds.size.height*0.5-containerHeight*0.5-20,
             width: containerWidth,
             height: containerHeight
         )
@@ -328,3 +334,156 @@ extension UIViewController {
 }
 
 
+
+class SimulatorScreenshotDetector {
+    private var lastScreenshotURL: URL?
+    private var pollingTimer: Timer?
+    private let pollingInterval: TimeInterval = 1.0 // 1秒检查一次
+    
+    func startMonitoring() {
+        // 仅在模拟器环境运行
+        #if targetEnvironment(simulator)
+        stopMonitoring()
+        
+        // 获取模拟器截图目录
+        guard let screenshotDir = getScreenshotDirectory() else { return }
+        
+        // 记录当前最新的截图
+        lastScreenshotURL = getLatestScreenshot(in: screenshotDir)
+        
+        // 启动定时器
+        pollingTimer = Timer.scheduledTimer(withTimeInterval: pollingInterval,
+                                          repeats: true) { [weak self] _ in
+            self?.checkForNewScreenshot()
+        }
+        
+        // 确保定时器在滚动视图中也能工作
+        RunLoop.current.add(pollingTimer!, forMode: .common)
+        #endif
+    }
+    
+    private func checkForNewScreenshot() {
+        guard let screenshotDir = getScreenshotDirectory() else { return }
+        
+        if let latestScreenshot = getLatestScreenshot(in: screenshotDir) {
+            // 检查是否是新截图
+            if let lastURL = lastScreenshotURL {
+                if latestScreenshot != lastURL {
+                    // 发现新截图
+                    lastScreenshotURL = latestScreenshot
+                    notifyScreenshotTaken(latestScreenshot)
+                }
+            } else {
+                // 第一次检测
+                lastScreenshotURL = latestScreenshot
+            }
+        }
+    }
+    
+    private func getScreenshotDirectory() -> URL? {
+        // 方法1：检查桌面（默认保存位置）
+        let desktopURL = FileManager.default.urls(for: .desktopDirectory,
+                                                 in: .userDomainMask).first
+        
+        // 方法2：检查模拟器照片库
+        let simulatorMediaURL = getSimulatorMediaDirectory()
+        
+        // 优先使用桌面目录
+        return desktopURL ?? simulatorMediaURL
+    }
+    
+    private func getSimulatorMediaDirectory() -> URL? {
+        // 获取当前模拟器的设备ID
+        let deviceId = ProcessInfo.processInfo.environment["SIMULATOR_UDID"] ?? ""
+        
+        guard !deviceId.isEmpty else { return nil }
+        
+        // 构建路径
+        let path = "~/Library/Developer/CoreSimulator/Devices/\(deviceId)/data/Media/DCIM/100APPLE"
+        
+        // 展开波浪号
+        let expandedPath = (path as NSString).expandingTildeInPath
+        
+        // 检查目录是否存在
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: expandedPath, isDirectory: &isDir), isDir.boolValue {
+            return URL(fileURLWithPath: expandedPath)
+        }
+        
+        return nil
+    }
+    
+    private func getLatestScreenshot(in directory: URL) -> URL? {
+        do {
+            // 获取目录下所有文件
+            let files = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.creationDateKey, .contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            )
+            
+            // 过滤截图文件（模拟器截图通常以"Screenshot"或"模拟器屏幕快照"开头）
+            let screenshotFiles = files.filter { url in
+                let filename = url.lastPathComponent.lowercased()
+                return filename.hasPrefix("screenshot") ||
+                       filename.hasPrefix("模拟器屏幕快照") ||
+                       filename.hasPrefix("simulator screen shot")
+            }
+            
+            // 按修改时间排序，获取最新的
+            let sortedFiles = screenshotFiles.sorted { url1, url2 in
+                let date1 = (try? url1.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate ?? Date.distantPast
+                let date2 = (try? url2.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate ?? Date.distantPast
+                return date1 > date2
+            }
+            
+            return sortedFiles.first
+        } catch {
+            print("Error reading directory: \(error)")
+            return nil
+        }
+    }
+    
+    private func notifyScreenshotTaken(_ screenshotURL: URL) {
+        // 模拟系统通知
+        NotificationCenter.default.post(
+            name: UIApplication.userDidTakeScreenshotNotification,
+            object: nil,
+            userInfo: ["screenshotURL": screenshotURL]
+        )
+        
+        // 延迟一点点，确保文件已经完全写入
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // 可选：读取截图数据
+            self.handleNewScreenshot(at: screenshotURL)
+        }
+    }
+    
+    private func handleNewScreenshot(at url: URL) {
+        do {
+            // 读取图片数据
+            let imageData = try Data(contentsOf: url)
+            
+            // 可以在这里进行进一步处理
+            if let image = UIImage(data: imageData) {
+                print("Screenshot detected: \(url.lastPathComponent)")
+                print("Size: \(image.size)")
+                
+                // 触发业务逻辑
+                self.onScreenshotDetected?(image, url)
+            }
+        } catch {
+            print("Error reading screenshot: \(error)")
+        }
+    }
+    
+    func stopMonitoring() {
+        pollingTimer?.invalidate()
+        pollingTimer = nil
+    }
+    
+    // 回调
+    var onScreenshotDetected: ((UIImage, URL) -> Void)?
+}
