@@ -9,7 +9,8 @@ import UIKit
 
 public class DebugScreenshotManager {
     public  static let shared = DebugScreenshotManager()
-    public weak var appWindow:UIWindow?
+    /// 当前截屏的视图，用户监听到截图时模拟用户截屏动作
+    public var currentSreenshotHandle:(()->UIWindow?)?
     /// 自动隐藏事件
     public  var autoHideTime:Double = 8
     /// 最近一次截图的原始图片
@@ -31,6 +32,11 @@ public class DebugScreenshotManager {
         }
        
     }
+    
+    private  var appWindow:UIWindow?{
+        currentSreenshotHandle?()
+    }
+    
     init() {
         NotificationCenter.default.addObserver(self, selector: #selector(handleScreenDidChange), name: UIApplication.userDidTakeScreenshotNotification, object: nil)
     }
