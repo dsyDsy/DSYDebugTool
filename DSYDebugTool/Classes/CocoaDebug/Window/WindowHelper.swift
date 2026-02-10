@@ -82,6 +82,15 @@ public class WindowHelper: NSObject {
 //        uiBlockingCounter.stopMonitoring()
         _RunloopMonitor.shared().end()
     }
+    
+    
+    public var isListViewBeingDisplayed:Bool {
+        return self.displayedList
+    }
+    
+  public  func screenshot(){
+        NotificationCenter.default.post(name: NSNotification.Name(rawValue: "DebugScreenshotManager_screenshotName"), object: nil, userInfo: nil)
+    }
 }
 
 

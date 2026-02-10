@@ -7,8 +7,34 @@
 //
 
 import UIKit
+extension _DirectoryContentsTableViewController:DebugTabBarDoubleTapHandler {
+    public func handleTabBarDoubleTap() -> Bool {
+        // 安全检查：确保视图已显示
+        guard view.window != nil else {
+            return false
+        }
+        WindowHelper.shared.screenshot()
+        return true
+    }
+    
+}
+
+
+/// TabBar 双击处理协议
+/// 实现此协议的页面可以响应双击 TabBar 的操作
+public protocol DebugTabBarDoubleTapHandler: AnyObject {
+    /// 处理双击 TabBar 事件
+    /// - Returns: 是否已处理（返回 true 表示已处理，false 表示未处理或不需要处理）
+    func handleTabBarDoubleTap() -> Bool
+}
 
 class CocoaDebugTabBarController: UITabBarController {
+    /// 记录上次点击 tabbar 的时间
+    private var lastTabBarTapTime: TimeInterval = 0
+    /// 记录上次点击的 tabbar 索引
+    private var lastTabBarIndex: Int = -1
+    /// 双击时间间隔阈值（秒）
+    private let doubleTapTimeInterval: TimeInterval = 0.5
     
     //MARK: - init
     override func viewDidLoad() {
@@ -109,13 +135,24 @@ class CocoaDebugTabBarController: UITabBarController {
     @objc func exit() {
         dismiss(animated: true, completion: nil)
     }
-    
-    //MARK: - show more than 5 tabs by CocoaDebug
-    //    override var traitCollection: UITraitCollection {
-    //        var realTraits = super.traitCollection
-    //        var lieTrait = UITraitCollection.init(horizontalSizeClass: .regular)
-    //        return UITraitCollection(traitsFrom: [realTraits, lieTrait])
-    //    }
+
+    /// 处理双击 TabBar 事件（通用方法）
+    /// - Parameter index: 被双击的 TabBar 索引
+    private func handleDoubleTap(at index: Int) {
+        // 获取当前选中的导航控制器
+        guard index < viewControllers?.count ?? 0,
+              let navController = viewControllers?[index] as? UINavigationController,
+              let topViewController = navController.topViewController else {
+            return
+        }
+        
+        // 检查 topViewController 是否实现了 TabBarDoubleTapHandler 协议
+        if let handler = topViewController as? DebugTabBarDoubleTapHandler {
+            // 调用处理器的双击处理方法
+            _ = handler.handleTabBarDoubleTap()
+        }
+    }
+
 }
 
 //MARK: - UITabBarDelegate
@@ -129,5 +166,22 @@ extension CocoaDebugTabBarController {
                 CocoaDebugSettings.shared.tabBarSelectItem = index
             }
         }
+        
+        // 检测双击 tabbar
+        let currentTime = Date().timeIntervalSince1970
+        let currentIndex = selectedIndex
+        
+        // 检测是否为双击（同一 tab 在时间间隔内连续点击）
+        if currentIndex == lastTabBarIndex {
+            let timeInterval = currentTime - lastTabBarTapTime
+            if timeInterval < doubleTapTimeInterval {
+                // 双击事件，尝试处理
+                handleDoubleTap(at: currentIndex)
+            }
+        }
+        
+        // 更新记录
+        lastTabBarTapTime = currentTime
+        lastTabBarIndex = currentIndex
     }
 }

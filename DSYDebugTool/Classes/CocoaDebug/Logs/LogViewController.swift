@@ -7,6 +7,17 @@
 //
 
 import UIKit
+extension  LogViewController:DebugTabBarDoubleTapHandler{
+    func handleTabBarDoubleTap() -> Bool {
+        // 安全检查：确保视图已显示
+        guard view.window != nil else {
+            return false
+        }
+        WindowHelper.shared.screenshot()
+        return true
+    }
+}
+
 
 class LogViewController: UIViewController {
     

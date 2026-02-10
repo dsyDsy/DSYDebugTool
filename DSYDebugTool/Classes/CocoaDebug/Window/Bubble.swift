@@ -289,7 +289,7 @@ class Bubble: UIView {
     }
     //MARK: - target action
     @objc func doubletap() {
-            NotificationCenter.default.post(name: NSNotification.Name(rawValue: "DebugScreenshotManager_screenshotName"), object: nil, userInfo: nil)
+        WindowHelper.shared.screenshot()
     }
     
     @objc func panDidFire(panner: UIPanGestureRecognizer) {
