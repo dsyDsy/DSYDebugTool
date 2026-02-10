@@ -11,8 +11,14 @@ public class DebugScreenshotManager {
     public  static let shared = DebugScreenshotManager()
     /// 当前截屏的视图，用户监听到截图时模拟用户截屏动作
     public var currentSreenshotHandle:(()->UIWindow?)?
+    public var backgroundColor:UIColor = .white.withAlphaComponent(0.8)
+    
     /// 自动隐藏事件
-    public  var autoHideTime:Double = 8
+    public  var autoHideTime:Int = 8{
+        didSet{
+            currentInterval = autoHideTime
+        }
+    }
     /// 最近一次截图的原始图片
     private var lastScreenshotImage: UIImage?
     /// 截图缩略图浮层
@@ -36,9 +42,14 @@ public class DebugScreenshotManager {
         currentSreenshotHandle?()
     }
     
+    private var timer: Timer?
+    private var currentInterval:Int = 0
+    
     init() {
+        currentInterval = autoHideTime
         NotificationCenter.default.addObserver(self, selector: #selector(handleSystemScreenDidChange), name: UIApplication.userDidTakeScreenshotNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleScreenDidChange), name: NSNotification.Name(rawValue: "DebugScreenshotManager_screenshotName"), object: nil)
+     
     }
     
     public func didScreenshot(){
@@ -47,7 +58,15 @@ public class DebugScreenshotManager {
     
     @objc   func handleSystemScreenDidChange(notification: NSNotification) {
         guard isEnableSystemMonitoring == true else {return}
-        self.handleScreenDidChange(notification: notification)
+        DebugScreenshotLastDetector.screenshotTaken { image in
+            if let image = image {
+                self.lastScreenshotImage = image
+                self.showScreenshotPreview(with: image)
+            }else {
+                self.handleScreenDidChange(notification: notification)
+            }
+        }
+       
     }
     
     @objc   func handleScreenDidChange(notification: NSNotification) {
@@ -74,7 +93,14 @@ extension DebugScreenshotManager {
     /// 展示截图缩略图浮层，右上角显示，底部带“取消 / 编辑”按钮
     /// 预览视图尺寸根据屏幕等比计算，不使用固定宽高
     private func showScreenshotPreview(with image: UIImage) {
-        guard let window = appWindow else { return }
+        guard let window = appWindow else {
+            screenshotPreviewContainer?.removeFromSuperview()
+            screenshotPreviewContainer = nil
+            self.stopTimer()
+            return
+        }
+        self.stopTimer()
+
         // 若已存在旧的预览视图，先移除
         if let container = screenshotPreviewContainer {
             container.removeFromSuperview()
@@ -103,7 +129,7 @@ extension DebugScreenshotManager {
             print("视图隐藏，方向: \(direction)")
             self?.hideScreenshotPreview()
         }
-        container.backgroundColor = UIColor.white.withAlphaComponent(0.6)
+        container.backgroundColor = backgroundColor
         container.layer.cornerRadius = 6
         container.clipsToBounds = true
         container.alpha = 0
@@ -111,7 +137,7 @@ extension DebugScreenshotManager {
         let imageView = UIImageView(image: image)
         // 按宽高比完整展示截图
         imageView.contentMode = .scaleAspectFit
-        imageView.backgroundColor = .black
+        imageView.backgroundColor = .clear
         imageView.clipsToBounds = true
         container.addSubview(imageView)
         
@@ -146,8 +172,8 @@ extension DebugScreenshotManager {
         
         let editButton = UIButton(type: .system)
         editButton.setTitle("编辑", for: .normal)
-        editButton.setTitleColor(.yellow, for: .normal)
-        editButton.titleLabel?.font = UIFont.systemFont(ofSize: 14)
+        editButton.setTitleColor(.red, for: .normal)
+        editButton.titleLabel?.font = UIFont.systemFont(ofSize: 16)
         editButton.addTarget(self, action: #selector(screenshotEditTapped), for: .touchUpInside)
         
         buttonContainer.addArrangedSubview(editButton)
@@ -162,9 +188,9 @@ extension DebugScreenshotManager {
         container.show()
         
         // 若一段时间内未操作，自动隐藏
-        DispatchQueue.main.asyncAfter(deadline: .now() + autoHideTime) { [weak self] in
-            self?.hideScreenshotPreview()
-        }
+        currentInterval = autoHideTime
+        startTimer()
+       
     }
     
     /// 隐藏并移除截图预览视图
@@ -182,20 +208,19 @@ extension DebugScreenshotManager {
     @objc private func screenshotSendTapped() {
         hideScreenshotPreview()
         if let image = lastScreenshotImage {
-            self.screenshotUpload(isSend: true, image: image)
+            self.screenshotUpload(image: image)
         }
         lastScreenshotImage = nil
        
     }
     
-    /// 点击“编辑”按钮 -> 进入 ZLImageEditor 编辑
+    /// 点击“编辑”按钮
     @objc private func screenshotEditTapped() {
         guard var image = lastScreenshotImage else {
             hideScreenshotPreview()
             return
         }
         hideScreenshotPreview()
-        
         
         if let topVC =  self.appWindow?.rootViewController?.topMostViewController {
             ZLImageEditorConfiguration.default()
@@ -204,25 +229,31 @@ extension DebugScreenshotManager {
             let w = min(1500, image.zl.width)
             let h = w * image.zl.height / image.zl.width
             image = image.zl.resize(CGSize(width: w, height: h)) ?? image
-            ZLEditImageViewController.showEditImageVC(parentVC: topVC, image: image) { resImage, editModel in
-                self.screenshotUpload(isSend: false, image: resImage)
+            let vc = ZLEditImageViewController(image: image, editModel: nil)
+            vc.editFinishBlock = {[weak self] resImage, editImageModel in
+                self?.screenshotUpload(image: resImage)
             }
+            vc.cancelBlock = { [weak self] in
+                if let image = self?.lastScreenshotImage {
+                    self?.showScreenshotPreview(with: image)
+                }
+            }
+            vc.modalPresentationStyle = .custom
+            topVC.present(vc, animated: true, completion: nil)
         }
     }
 
-    func screenshotUpload(isSend:Bool,image:UIImage){
-        if isSend {
-            // 使用方式
-            self.saveImage(image) { result in
-                switch result {
-                case .success:
-                    print("保存成功")
-                case .failure(let error):
-                    print("保存失败: \(error.localizedDescription)")
-                }
+    func screenshotUpload(image:UIImage){
+        // 保存
+        self.saveImage(image) { result in
+            switch result {
+            case .success:
+                print("保存成功")
+            case .failure(let error):
+                print("保存失败: \(error.localizedDescription)")
             }
         }
-       
+        
         if let topVC =  self.appWindow?.rootViewController?.topMostViewController {
             // 1. 快速分享
             let fastAction = ActionItem(title: "快速分享", style: .default) {
@@ -264,6 +295,31 @@ extension DebugScreenshotManager {
     }
 
 }
+
+extension DebugScreenshotManager {
+    internal func startTimer() {
+        if self.currentInterval == 0 {
+            stopTimer()
+            return
+        }
+        let currentTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.currentInterval -= 1
+            if  self.currentInterval <= 0 {
+                self.hideScreenshotPreview()
+            }
+        }
+        RunLoop.current.add(currentTimer, forMode: .common)
+        timer = currentTimer
+    }
+    
+    internal func stopTimer() {
+        currentInterval = 0
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
 
 import UIKit
 import Photos
@@ -332,157 +388,3 @@ extension UIViewController {
     }
 }
 
-
-
-class SimulatorScreenshotDetector {
-    private var lastScreenshotURL: URL?
-    private var pollingTimer: Timer?
-    private let pollingInterval: TimeInterval = 1.0 // 1秒检查一次
-    
-    func startMonitoring() {
-        // 仅在模拟器环境运行
-        #if targetEnvironment(simulator)
-        stopMonitoring()
-        
-        // 获取模拟器截图目录
-        guard let screenshotDir = getScreenshotDirectory() else { return }
-        
-        // 记录当前最新的截图
-        lastScreenshotURL = getLatestScreenshot(in: screenshotDir)
-        
-        // 启动定时器
-        pollingTimer = Timer.scheduledTimer(withTimeInterval: pollingInterval,
-                                          repeats: true) { [weak self] _ in
-            self?.checkForNewScreenshot()
-        }
-        
-        // 确保定时器在滚动视图中也能工作
-        RunLoop.current.add(pollingTimer!, forMode: .common)
-        #endif
-    }
-    
-    private func checkForNewScreenshot() {
-        guard let screenshotDir = getScreenshotDirectory() else { return }
-        
-        if let latestScreenshot = getLatestScreenshot(in: screenshotDir) {
-            // 检查是否是新截图
-            if let lastURL = lastScreenshotURL {
-                if latestScreenshot != lastURL {
-                    // 发现新截图
-                    lastScreenshotURL = latestScreenshot
-                    notifyScreenshotTaken(latestScreenshot)
-                }
-            } else {
-                // 第一次检测
-                lastScreenshotURL = latestScreenshot
-            }
-        }
-    }
-    
-    private func getScreenshotDirectory() -> URL? {
-        // 方法1：检查桌面（默认保存位置）
-        let desktopURL = FileManager.default.urls(for: .desktopDirectory,
-                                                 in: .userDomainMask).first
-        
-        // 方法2：检查模拟器照片库
-        let simulatorMediaURL = getSimulatorMediaDirectory()
-        
-        // 优先使用桌面目录
-        return desktopURL ?? simulatorMediaURL
-    }
-    
-    private func getSimulatorMediaDirectory() -> URL? {
-        // 获取当前模拟器的设备ID
-        let deviceId = ProcessInfo.processInfo.environment["SIMULATOR_UDID"] ?? ""
-        
-        guard !deviceId.isEmpty else { return nil }
-        
-        // 构建路径
-        let path = "~/Library/Developer/CoreSimulator/Devices/\(deviceId)/data/Media/DCIM/100APPLE"
-        
-        // 展开波浪号
-        let expandedPath = (path as NSString).expandingTildeInPath
-        
-        // 检查目录是否存在
-        var isDir: ObjCBool = false
-        if FileManager.default.fileExists(atPath: expandedPath, isDirectory: &isDir), isDir.boolValue {
-            return URL(fileURLWithPath: expandedPath)
-        }
-        
-        return nil
-    }
-    
-    private func getLatestScreenshot(in directory: URL) -> URL? {
-        do {
-            // 获取目录下所有文件
-            let files = try FileManager.default.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: [.creationDateKey, .contentModificationDateKey],
-                options: [.skipsHiddenFiles]
-            )
-            
-            // 过滤截图文件（模拟器截图通常以"Screenshot"或"模拟器屏幕快照"开头）
-            let screenshotFiles = files.filter { url in
-                let filename = url.lastPathComponent.lowercased()
-                return filename.hasPrefix("screenshot") ||
-                       filename.hasPrefix("模拟器屏幕快照") ||
-                       filename.hasPrefix("simulator screen shot")
-            }
-            
-            // 按修改时间排序，获取最新的
-            let sortedFiles = screenshotFiles.sorted { url1, url2 in
-                let date1 = (try? url1.resourceValues(forKeys: [.contentModificationDateKey]))?
-                    .contentModificationDate ?? Date.distantPast
-                let date2 = (try? url2.resourceValues(forKeys: [.contentModificationDateKey]))?
-                    .contentModificationDate ?? Date.distantPast
-                return date1 > date2
-            }
-            
-            return sortedFiles.first
-        } catch {
-            print("Error reading directory: \(error)")
-            return nil
-        }
-    }
-    
-    private func notifyScreenshotTaken(_ screenshotURL: URL) {
-        // 模拟系统通知
-        NotificationCenter.default.post(
-            name: UIApplication.userDidTakeScreenshotNotification,
-            object: nil,
-            userInfo: ["screenshotURL": screenshotURL]
-        )
-        
-        // 延迟一点点，确保文件已经完全写入
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // 可选：读取截图数据
-            self.handleNewScreenshot(at: screenshotURL)
-        }
-    }
-    
-    private func handleNewScreenshot(at url: URL) {
-        do {
-            // 读取图片数据
-            let imageData = try Data(contentsOf: url)
-            
-            // 可以在这里进行进一步处理
-            if let image = UIImage(data: imageData) {
-                print("Screenshot detected: \(url.lastPathComponent)")
-                print("Size: \(image.size)")
-                
-                // 触发业务逻辑
-                self.onScreenshotDetected?(image, url)
-            }
-        } catch {
-            print("Error reading screenshot: \(error)")
-        }
-    }
-    
-    func stopMonitoring() {
-        pollingTimer?.invalidate()
-        pollingTimer = nil
-    }
-    
-    // 回调
-    var onScreenshotDetected: ((UIImage, URL) -> Void)?
-}

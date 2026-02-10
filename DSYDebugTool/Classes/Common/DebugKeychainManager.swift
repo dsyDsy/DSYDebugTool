@@ -137,25 +137,25 @@ public class DebugKeychainManager {
         return status == errSecSuccess
     }
     
-    // MARK: - 清空所有项目（谨慎使用！）
-    @discardableResult
-    public  static func clearAll() -> Bool {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword
-        ]
-        
-        let status = SecItemDelete(query as CFDictionary)
-        
-        #if DEBUG
-        if status == errSecSuccess {
-            print("✅ Keychain清空成功")
-        } else {
-            print("❌ Keychain清空失败, 错误码: \(status)")
-        }
-        #endif
-        
-        return status == errSecSuccess
-    }
+//    // MARK: - 清空所有项目（谨慎使用！）
+//    @discardableResult
+//    public  static func clearAll() -> Bool {
+//        let query: [String: Any] = [
+//            kSecClass as String: kSecClassGenericPassword
+//        ]
+//        
+//        let status = SecItemDelete(query as CFDictionary)
+//        
+//        #if DEBUG
+//        if status == errSecSuccess {
+//            print("✅ Keychain清空成功")
+//        } else {
+//            print("❌ Keychain清空失败, 错误码: \(status)")
+//        }
+//        #endif
+//        
+//        return status == errSecSuccess
+//    }
     
     // MARK: - 获取所有存储的Key
     @discardableResult

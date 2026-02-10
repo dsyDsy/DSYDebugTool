@@ -68,7 +68,7 @@ extension CocoaDebugViewController: BubbleDelegate {
         } else {
             vc.view.backgroundColor = .white
         }
-        vc.modalPresentationStyle = .fullScreen
+        vc.modalPresentationStyle = .custom
         self.present(vc, animated: true, completion: nil)
     }
 }
