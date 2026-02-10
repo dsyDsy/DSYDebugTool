@@ -58,14 +58,15 @@ public class DebugScreenshotManager {
     
     @objc   func handleSystemScreenDidChange(notification: NSNotification) {
         guard isEnableSystemMonitoring == true else {return}
-        DebugScreenshotLastDetector.screenshotTaken { image in
-            if let image = image {
-                self.lastScreenshotImage = image
-                self.showScreenshotPreview(with: image)
-            }else {
-                self.handleScreenDidChange(notification: notification)
-            }
-        }
+        self.handleScreenDidChange(notification: notification)
+//        DebugScreenshotLastDetector.screenshotTaken { image in
+//            if let image = image {
+//                self.lastScreenshotImage = image
+//                self.showScreenshotPreview(with: image)
+//            }else {
+//                self.handleScreenDidChange(notification: notification)
+//            }
+//        }
        
     }
     
