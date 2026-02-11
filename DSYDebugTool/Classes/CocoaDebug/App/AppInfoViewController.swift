@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import DeviceKit
 extension  AppInfoViewController:DebugTabBarDoubleTapHandler{
     func handleTabBarDoubleTap() -> Bool {
         // 安全检查：确保视图已显示
@@ -35,7 +36,6 @@ class AppInfoViewController: UITableViewController {
     @IBOutlet weak var webViewSwitch: UISwitch!
     @IBOutlet weak var slowAnimationsSwitch: UISwitch!
     @IBOutlet weak var naviItem: UINavigationItem!
-    @IBOutlet weak var rnSwitch: UISwitch!
     @IBOutlet weak var uiBlockingSwitch: UISwitch!
     
     var naviItemTitleLabel: UILabel?
@@ -58,7 +58,7 @@ class AppInfoViewController: UITableViewController {
         labelBundleName.text = CocoaDebugDeviceInfo.sharedInstance().appBundleName
         
         labelScreenResolution.text = "\(Int(CocoaDebugDeviceInfo.sharedInstance().resolution.width))" + "*" + "\(Int(CocoaDebugDeviceInfo.sharedInstance().resolution.height))"
-        labelDeviceModel.text = "\(CocoaDebugDeviceInfo.sharedInstance().getPlatformString)"
+        labelDeviceModel.text = "\(Device.current.description)"
         
         labelBundleID.text = CocoaDebugDeviceInfo.sharedInstance().appBundleID
         
@@ -71,7 +71,7 @@ class AppInfoViewController: UITableViewController {
         
         logSwitch.isOn = CocoaDebugSettings.shared.enableLogMonitoring
         networkSwitch.isOn = !CocoaDebugSettings.shared.disableNetworkMonitoring
-        rnSwitch.isOn = CocoaDebugSettings.shared.enableRNMonitoring
+    
         webViewSwitch.isOn = CocoaDebugSettings.shared.enableWKWebViewMonitoring
         slowAnimationsSwitch.isOn = CocoaDebugSettings.shared.slowAnimations
         crashSwitch.isOn = CocoaDebugSettings.shared.enableCrashRecording
@@ -79,7 +79,6 @@ class AppInfoViewController: UITableViewController {
 
         logSwitch.addTarget(self, action: #selector(logSwitchChanged), for: UIControl.Event.valueChanged)
         networkSwitch.addTarget(self, action: #selector(networkSwitchChanged), for: UIControl.Event.valueChanged)
-        rnSwitch.addTarget(self, action: #selector(rnSwitchChanged), for: UIControl.Event.valueChanged)
         webViewSwitch.addTarget(self, action: #selector(webViewSwitchChanged), for: UIControl.Event.valueChanged)
         slowAnimationsSwitch.addTarget(self, action: #selector(slowAnimationsSwitchChanged), for: UIControl.Event.valueChanged)
         crashSwitch.addTarget(self, action: #selector(crashSwitchChanged), for: UIControl.Event.valueChanged)
@@ -138,11 +137,6 @@ class AppInfoViewController: UITableViewController {
     
     @objc func logSwitchChanged(sender: UISwitch) {
         CocoaDebugSettings.shared.enableLogMonitoring = logSwitch.isOn
-        self.showAlert()
-    }
-    
-    @objc func rnSwitchChanged(sender: UISwitch) {
-        CocoaDebugSettings.shared.enableRNMonitoring = rnSwitch.isOn
         self.showAlert()
     }
     

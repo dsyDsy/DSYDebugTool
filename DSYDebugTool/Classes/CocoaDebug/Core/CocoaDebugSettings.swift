@@ -94,12 +94,7 @@ import Foundation
             UserDefaults.standard.synchronize()
         }
     }
-    @objc public var enableRNMonitoring: Bool = false {
-        didSet {
-            UserDefaults.standard.set(enableRNMonitoring, forKey: "enableRNMonitoring_CocoaDebug")
-            UserDefaults.standard.synchronize()
-        }
-    }
+  
     @objc public var enableMemoryLeaksMonitoring_ViewController: Bool = false {
         didSet {
             UserDefaults.standard.set(enableMemoryLeaksMonitoring_ViewController, forKey: "enableMemoryLeaksMonitoring_UIViewController_CocoaDebug")
@@ -294,7 +289,6 @@ import Foundation
         enableWKWebViewMonitoring = UserDefaults.standard.bool(forKey: "enableWKWebViewMonitoring_CocoaDebug")
         enableLogMonitoring = UserDefaults.standard.bool(forKey: "enableLogMonitoring_CocoaDebug")
         disableNetworkMonitoring = UserDefaults.standard.bool(forKey: "disableNetworkMonitoring_CocoaDebug")
-        enableRNMonitoring = UserDefaults.standard.bool(forKey: "enableRNMonitoring_CocoaDebug")
         tabBarSelectItem = UserDefaults.standard.integer(forKey: "tabBarSelectItem_CocoaDebug")
         logSelectIndex = UserDefaults.standard.integer(forKey: "logSelectIndex_CocoaDebug")
         networkLastIndex = UserDefaults.standard.integer(forKey: "networkLastIndex_CocoaDebug")

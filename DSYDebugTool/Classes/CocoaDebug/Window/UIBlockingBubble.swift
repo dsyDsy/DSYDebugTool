@@ -73,16 +73,16 @@ class UIBlockingBubble: UIView {
                 center.x = UIScreen.main.bounds.width/2.0
                 center.y = 39
                 
-                let string = CocoaDebugDeviceInfo.sharedInstance().getPlatformString
-                if string == "iPhone 12 mini" {
-                    center.y = 43
-                } else if string == "iPhone 12" {
-                    center.y = 41
-                } else if string == "iPhone 12 Pro" {
-                    center.y = 41
-                } else if string == "iPhone 12 Pro Max" {
-                    center.y = 41
-                }
+//                let string = CocoaDebugDeviceInfo.sharedInstance().getPlatformString
+//                if string == "iPhone 12 mini" {
+//                    center.y = 43
+//                } else if string == "iPhone 12" {
+//                    center.y = 41
+//                } else if string == "iPhone 12 Pro" {
+//                    center.y = 41
+//                } else if string == "iPhone 12 Pro Max" {
+//                    center.y = 41
+//                }
             }
         }
     }

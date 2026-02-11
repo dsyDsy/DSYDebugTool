@@ -39,6 +39,7 @@ class IgnoredURLsViewController: UITableViewController {
         
         ignoredPrefixLogs = CocoaDebugSettings.shared.ignoredPrefixLogs
         onlyPrefixLogs = CocoaDebugSettings.shared.onlyPrefixLogs
+        tableView.reloadData()
     }
 }
 
@@ -88,22 +89,25 @@ extension IgnoredURLsViewController {
         return cell
     }
     
-    override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        
+    
+    override func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        let lable = UILabel()
+        lable.font = .systemFont(ofSize: 16, weight: .bold)
+        lable.textColor = .white
+        lable.numberOfLines = 0
         switch section {
         case 0:
-            return "ignored URLs"
+            lable.text = "  ignored URLs"
         case 1:
-            return "only URLs"
+            lable.text = "  only URLs"
         case 2:
-            return "ignored Prefix Logs"
+            lable.text = "  ignored Prefix Logs"
         case 3:
-            return "only Prefix Logs"
+            lable.text = "  only Prefix Logs"
         default:
-            break
+            lable.text = ""
         }
-        
-        return ""
+        return lable
     }
 }
 

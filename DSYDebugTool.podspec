@@ -55,6 +55,7 @@ TODO: Add long description of the pod here.
           ss.public_header_files = "DSYDebugTool/Classes/CocoaDebug/**/*.h"
           ss.resources           = "DSYDebugTool/Classes/CocoaDebug/**/*.{png,xib,storyboard}"
           ss.frameworks          = 'UIKit', 'Foundation', 'JavaScriptCore', 'QuickLook'
+          ss.dependency  'DeviceKit'
           ss.dependency  'DSYDebugTool/ShareActivity'
           ss.dependency  'DSYDebugTool/TransferServer'
     end

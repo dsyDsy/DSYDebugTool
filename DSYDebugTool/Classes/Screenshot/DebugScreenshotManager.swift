@@ -24,10 +24,13 @@ public class DebugScreenshotManager {
     /// 截图缩略图浮层
     private var screenshotPreviewContainer: DebugScreenshotContentView?
  
-    
+    /// 开启系统截屏通知，默认开启
     public var isEnableSystemMonitoring:Bool {
         get{
-            return DebugKeychainManager.load("debug_open_didTakeScreenshot") == "1"
+            if  let value = DebugKeychainManager.load("debug_open_didTakeScreenshot") {
+                return value == "1"
+            }
+            return true
         }
         set{
             if newValue == true {
