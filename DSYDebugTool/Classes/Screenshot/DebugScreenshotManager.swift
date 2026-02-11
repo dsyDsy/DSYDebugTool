@@ -11,7 +11,10 @@ public class DebugScreenshotManager {
     public  static let shared = DebugScreenshotManager()
     /// 当前截屏的视图，用户监听到截图时模拟用户截屏动作
     public var currentSreenshotHandle:(()->UIWindow?)?
+    /// 背景颜色
     public var backgroundColor:UIColor = .white.withAlphaComponent(0.8)
+    /// 距离底部距离
+    public var containerBottomY:CGFloat = 150
     
     /// 自动隐藏事件
     public  var autoHideTime:Int = 8{
@@ -120,7 +123,7 @@ extension DebugScreenshotManager {
         let frame = CGRect(
             // 右上角：考虑 safeAreaInsets
             x: window.bounds.width - containerWidth - 16 - window.safeAreaInsets.right,
-            y: window.bounds.size.height*0.5-containerHeight*0.5-20,
+            y: window.bounds.size.height-containerHeight-containerBottomY,
             width: containerWidth,
             height: containerHeight
         )
