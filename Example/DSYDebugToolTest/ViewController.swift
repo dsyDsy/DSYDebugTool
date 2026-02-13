@@ -191,6 +191,8 @@ class ViewController: UIViewController {
      
         
         DebugScreenshotManager.shared.autoHideTime = 8
+        DebugScreenshotManager.shared.backgroundColor = .black.withAlphaComponent(0.5)
+        DebugScreenshotManager.shared.containerBottomY = 200
         DebugScreenshotManager.shared.currentSreenshotHandle = {
             if WindowHelper.shared.isListViewBeingDisplayed {
                return WindowHelper.shared.window
@@ -217,6 +219,16 @@ extension UIApplication {
             // 3. 只保留前台活跃状态的场景（用户正在交互）
             .first { $0.activationState == .foregroundActive }
             // 4. 取该场景下标记为 key 的窗口，若无则取第一个窗口
-            .flatMap { $0.windows.first { $0.isKeyWindow } ?? $0.windows.first }
+            .flatMap { $0.windows.first { win in
+                if  win.isKeyWindow {
+                    let className = String(describing: type(of: win))
+                    if className.lowercased().contains("cocoadebug") {
+                        return  false
+                    }
+                    return true
+                }
+                return false
+                
+            } ?? $0.windows.first }
     }
 }

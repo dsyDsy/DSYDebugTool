@@ -83,7 +83,7 @@ public class DebugScreenshotManager {
             // 使用 UIGraphicsImageRenderer 截取当前窗口内容，稳定性更好
             let renderer = UIGraphicsImageRenderer(bounds: appWindow.bounds)
             let screenshot = renderer.image { ctx in
-                appWindow.layer.render(in: ctx.cgContext)
+                appWindow.drawHierarchy(in: appWindow.bounds, afterScreenUpdates: true)
             }
             self.lastScreenshotImage = screenshot
             self.showScreenshotPreview(with: screenshot)
@@ -94,7 +94,7 @@ public class DebugScreenshotManager {
 
 
 // MARK: - 截图缩略图与编辑流程
-import ZLImageEditor
+
 extension DebugScreenshotManager {
     
     /// 展示截图缩略图浮层，右上角显示，底部带“取消 / 编辑”按钮

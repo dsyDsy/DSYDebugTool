@@ -34,6 +34,15 @@ TODO: Add long description of the pod here.
             ss.frameworks          = 'UIKit', 'Foundation'
             ss.dependency  'GCDWebServer'
     end
+    
+    s.subspec 'ZLImageEditor' do |ss|
+#      https://github.com/longitachi/ZLImageEditor 原项目地址
+            ss.source_files        = "DSYDebugTool/Classes/ZLImageEditor", "DSYDebugTool/Classes/ZLImageEditor/**/*.{h,m,mm,swift,c}"
+            ss.resources           = "DSYDebugTool/Classes/ZLImageEditor/**/*.{png,xib,storyboard}"
+            ss.frameworks          = 'UIKit', 'Foundation','Accelerate'
+            ss.resources            = 'DSYDebugTool/Classes/ZLImageEditor/*.{png,bundle}'
+#            ss.exclude_files      = ["DSYDebugTool/Classes/ZLImageEditor/General/ZLWeakProxy.swift"]
+    end
   
   # 基于CocoaDebug改动 原项目地址 https://github.com/CocoaDebug/CocoaDebug
     s.subspec 'CocoaDebug' do |ss|
@@ -65,7 +74,7 @@ TODO: Add long description of the pod here.
             ss.source_files        = "DSYDebugTool/Classes/Screenshot", "DSYDebugTool/Classes/Screenshot/**/*.{h,m,mm,swift,c}"
             ss.resources           = "DSYDebugTool/Classes/Screenshot/**/*.{png,xib,storyboard}"
             ss.frameworks          = 'UIKit', 'Foundation'
-            ss.dependency  'ZLImageEditor'
+            ss.dependency  'DSYDebugTool/ZLImageEditor'
             ss.dependency  'DSYDebugTool/ShareActivity'
             ss.dependency  'DSYDebugTool/TransferServer'
             ss.dependency  'DSYDebugTool/Common'
