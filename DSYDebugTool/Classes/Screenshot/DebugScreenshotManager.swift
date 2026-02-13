@@ -230,9 +230,20 @@ extension DebugScreenshotManager {
         hideScreenshotPreview()
         
         if let topVC =  self.appWindow?.rootViewController?.topMostViewController {
-            ZLImageEditorConfiguration.default()
+         
+            let configuration = ZLImageEditorConfiguration.default()
                 .editImageTools([.draw, .clip, .imageSticker, .textSticker, .mosaic, .filter, .adjust])
                 .adjustTools([.brightness, .contrast, .saturation])
+//            var colors = ZLImageEditorConfiguration.default().drawColors
+//            colors.removeFirst()
+//            colors.removeFirst()
+//            colors.insert(.black, at: 1)
+//            colors.insert(.white, at: 1)
+//            configuration.drawColors(colors)
+//            configuration.textStickerTextColors(colors)
+            configuration.textStickerDefaultTextColor =   .zl.rgba(249, 80, 81)
+            configuration.defaultDrawColor =    configuration.textStickerDefaultTextColor
+            
             let w = min(1500, image.zl.width)
             let h = w * image.zl.height / image.zl.width
             image = image.zl.resize(CGSize(width: w, height: h)) ?? image

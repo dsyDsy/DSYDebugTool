@@ -413,6 +413,7 @@ open class ZLEditImageViewController: UIViewController {
         parentVC: UIViewController?,
         animate: Bool = true,
         image: UIImage,
+        modalPresentationStyle:UIModalPresentationStyle = .custom,
         editModel: ZLEditImageModel? = nil,
         completion: ((UIImage, ZLEditImageModel?) -> Void)?,
         cancelBlock: (() -> Void)? = nil
@@ -434,7 +435,7 @@ open class ZLEditImageViewController: UIViewController {
                 cancelBlock?()
             }
             vc.animateDismiss = animate
-            vc.modalPresentationStyle = .fullScreen
+            vc.modalPresentationStyle = modalPresentationStyle
             parentVC?.present(vc, animated: animate, completion: nil)
         } else {
             let vc = ZLEditImageViewController(image: image, editModel: editModel)
@@ -445,7 +446,7 @@ open class ZLEditImageViewController: UIViewController {
                 cancelBlock?()
             }
             vc.animateDismiss = animate
-            vc.modalPresentationStyle = .fullScreen
+            vc.modalPresentationStyle = modalPresentationStyle
             parentVC?.present(vc, animated: animate, completion: nil)
         }
     }
@@ -935,9 +936,16 @@ open class ZLEditImageViewController: UIViewController {
             currentEditImage = buildImage()
         }
         
+        func showView(_ alpha:CGFloat){
+            self.mainScrollView.alpha = alpha
+            self.topShadowView.alpha = alpha
+            self.bottomShadowView.alpha = alpha
+            self.adjustSlider?.alpha = alpha
+        }
+        
         let vc = ZLClipImageViewController(image: currentEditImage, status: currentClipStatus)
         let rect = mainScrollView.convert(containerView.frame, to: view)
-        vc.presentingEditViewController = self
+//        vc.presentingEditViewController = self
         vc.presentAnimateFrame = rect
         vc.presentAnimateImage = currentEditImage.zl
             .clipImage(
@@ -945,24 +953,21 @@ open class ZLEditImageViewController: UIViewController {
                 editRect: currentClipStatus.editRect,
                 isCircle: currentClipStatus.ratio?.isCircle ?? false
             )
-        vc.modalPresentationStyle = .fullScreen
-        
+        vc.modalPresentationStyle = self.modalPresentationStyle
         vc.clipDoneBlock = { [weak self] angle, editRect, selectRatio in
             guard let `self` = self else { return }
-            
+            showView(1)
             self.clipImage(status: ZLClipStatus(editRect: editRect, angle: angle, ratio: selectRatio))
             self.editorManager.storeAction(.clip(oldStatus: self.preClipStatus, newStatus: self.currentClipStatus))
         }
         
         vc.cancelClipBlock = { [weak self] () in
+            showView(1)
             self?.resetContainerViewFrame()
         }
         
         present(vc, animated: false) {
-            self.mainScrollView.alpha = 0
-            self.topShadowView.alpha = 0
-            self.bottomShadowView.alpha = 0
-            self.adjustSlider?.alpha = 0
+            showView(0)
         }
         
         selectedTool = nil
@@ -1431,7 +1436,7 @@ open class ZLEditImageViewController: UIViewController {
             completion(text, textColor, font, image, style)
         }
         
-        vc.modalPresentationStyle = .fullScreen
+        vc.modalPresentationStyle = self.modalPresentationStyle
         showDetailViewController(vc, sender: nil)
     }
     
