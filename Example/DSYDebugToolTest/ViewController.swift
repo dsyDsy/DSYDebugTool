@@ -113,12 +113,19 @@ class ViewController: UIViewController {
    
     @objc func test(btn:UIButton){
         let url  = URLRequest(url: URL(string: "https://www.baidu.com")!)
-        URLSession.shared.dataTask(with: url){ data, response, error in
-            print(response)
+        URLSession.shared.dataTask(with: url){[weak self] data, response, error in
+            guard let self = self else {return }
+            let responseText = "\(response, default: "")"
+            print(responseText)
             print(error)
             DispatchQueue.main.async {
-                /// 发送文字到web
-                CocoaDebugSettings.shared.customNetworkShareHandler?("\(response)",nil)
+                let items: [Any] = [responseText]
+                let activity = CustomShareActivity.init(title: "快速分享", image: nil) {
+                    // 发送文字到web
+                    CocoaDebugSettings.shared.customNetworkShareHandler?(responseText,nil)
+                }
+                DebugActionSheetHelper.showSystemShare(items: items,activities: [activity], presentingViewController: self)
+                
             }
         }.resume()
        
@@ -128,18 +135,28 @@ class ViewController: UIViewController {
     @objc func fileTransferBtn(btn:UIButton){
         if  DebugFileTransferServer.shared.isRunning == false {
             DebugFileTransferServer.shared.startServer { [weak self] success, address in
-                if success, let address = address {
+                if success {
                     let uploadVC = DebugFileUploadViewController()
                     let navController = UINavigationController(rootViewController: uploadVC)
                     self?.present(navController, animated: true)
                 }else {
                     self?.msgLabel.text = "服务开启失败，不支持发送。请再次尝试......"
                 }
+                if  DebugFileTransferServer.shared.isRunning == false {
+                    self?.webServerLabel.text = "文件助手未启动"
+                }else {
+                    self?.webServerLabel.text =  "文件助手地址：\(DebugFileTransferServer.shared.getCompleteAddress() ?? "未开启")"
+                }
             }
         }else {
             let uploadVC = DebugFileUploadViewController()
             let navController = UINavigationController(rootViewController: uploadVC)
             self.present(navController, animated: true)
+            if  DebugFileTransferServer.shared.isRunning == false {
+                self.webServerLabel.text = "文件助手未启动"
+            }else {
+                self.webServerLabel.text =  "文件助手地址：\(DebugFileTransferServer.shared.getCompleteAddress() ?? "未开启")"
+            }
         }
      
        
@@ -148,6 +165,7 @@ class ViewController: UIViewController {
     
     class func initTool() {
 
+        CocoaDebugSettings.shared.serverURL = "dsy.test.com"
         CocoaDebugSettings.shared.bubbleSettings = CocoaDebugSettings.BubbleSettings(
             size: CGSize(width: 36, height: 36),
             backgroundColor:  .black,
@@ -163,43 +181,42 @@ class ViewController: UIViewController {
         CocoaDebugSettings.shared.enableUIBlockingMonitoring = false
         CocoaDebugSettings.shared.enableWKWebViewMonitoring = true
         CocoaDebugSettings.shared.enableCrashRecording = true
-        CocoaDebugSettings.shared.enableRNMonitoring  = false
-        CocoaDebugSettings.shared.logCount = 500;
-        CocoaDebugSettings.shared.httpCount = 200
+      
         // 配置自定义分享入口
         CocoaDebugSettings.shared.customNetworkShareTitle = "快速分享"
-//        CocoaDebugSettings.shared.customNetworkShareImage = UIImage(named: "custom_icon")
-        DebugFileTransferServer.shared.isDebugEnabled = true
-        DebugFileTransferServer.shared.serverPort = 8080
+        CocoaDebugSettings.shared.customNetworkShareImage = UIImage(named: "app_icon_sm")
         CocoaDebug.showBubble()
-        CocoaDebugSettings.shared.customNetworkShareHandler = { messageBody, httpModel in
-            // 自定义处理逻辑
-            DebugFileTransferServer.shared.log("处理网络请求信息:信息内容长度\( messageBody.count)")
-         
-            let vc =  UIViewController.appRootViewController as? ViewController
-            if  DebugFileTransferServer.shared.isRunning == false {
-                vc?.msgLabel.text = "正在开启服务，请稍等......"
-                DebugFileTransferServer.shared.startServer { success, address in
-                    if success, let address = address {
-                        
-                        DebugFileUploadViewController.uploadTextContent(messageBody)
-                        vc?.msgLabel.text = "发送完成，打开浏览器查看"
-                        vc?.webServerLabel.text = address
-                        UIPasteboard.general.string = address
-                    }else {
-                        vc?.msgLabel.text =   "服务开启失败，不支持发送。请再次尝试......"
-                    }
-                }
-            }else{
-                vc?.webServerLabel.text =  "文件助手地址：\(DebugFileTransferServer.shared.getCompleteAddress() ?? "未开启")"
-                UIPasteboard.general.string = DebugFileTransferServer.shared.getCompleteAddress()
-                DebugFileUploadViewController.uploadTextContent(messageBody)
-                vc?.msgLabel.text = "发送完成，打开浏览器查看"
+        DebugFileTransferServer.shared.isDebugLogEnabled = true
+        DebugFileTransferServer.shared.serverPort = 8080
+     
+        
+        DebugScreenshotManager.shared.autoHideTime = 8
+        DebugScreenshotManager.shared.currentSreenshotHandle = {
+            if WindowHelper.shared.isListViewBeingDisplayed {
+               return WindowHelper.shared.window
             }
-            
+            return UIApplication.shared.currentKeyWindow
+        }
+        CocoaDebugSettings.shared.customNetworkShareHandler = { messageBody, httpModel in
+            NetworkShareHelper.quickShare(text: messageBody)
+         
         }
     }
 
 
 }
 
+
+extension UIApplication {
+    /// 安全获取当前活跃场景中的主窗口
+    var currentKeyWindow: UIWindow? {
+        // 1. 获取所有已连接的场景
+        connectedScenes
+            // 2. 只保留 UIWindowScene 类型
+            .compactMap { $0 as? UIWindowScene }
+            // 3. 只保留前台活跃状态的场景（用户正在交互）
+            .first { $0.activationState == .foregroundActive }
+            // 4. 取该场景下标记为 key 的窗口，若无则取第一个窗口
+            .flatMap { $0.windows.first { $0.isKeyWindow } ?? $0.windows.first }
+    }
+}

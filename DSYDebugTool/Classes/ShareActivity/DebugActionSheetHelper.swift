@@ -71,7 +71,7 @@ public class CustomShareActivity: UIActivity {
     var image: UIImage?
     var handler: (() -> Void)?
     
-    init(title: String, image: UIImage? = nil, handler: @escaping () -> Void) {
+    public init(title: String, image: UIImage? = nil, handler: @escaping () -> Void) {
         self.title = title
         self.image = image
         self.handler = handler

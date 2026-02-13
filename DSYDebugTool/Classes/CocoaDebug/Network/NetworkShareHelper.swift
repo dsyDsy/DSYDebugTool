@@ -140,25 +140,26 @@ public class NetworkShareHelper {
     
     
   public  static func quickShare(text:String){
+        let window = DebugScreenshotManager.shared.currentSreenshotHandle?()
         if  DebugFileTransferServer.shared.isRunning == false {
             DebugFileTransferServer.shared.startServer { success, address in
                 if success, let address = address {
                     DebugFileTransferServer.shared.uploadTextContent(text)
-                    if let topVC = WindowHelper.shared.window.rootViewController?.topMostViewController {
+                    if let topVC =  window?.rootViewController?.topMostViewController {
                         DebugActionSheetHelper.showAlert(message: "发送完成，🌐 服务器地址：\(address)",actions: [UIAlertAction.init(title: "复制链接", style: .default,handler: { _ in
                             UIPasteboard.general.string = address
                         })],presentingViewController: topVC)
                     }
                   
                 }else {
-                    if let topVC = WindowHelper.shared.window.rootViewController?.topMostViewController {
+                    if let topVC = window?.rootViewController?.topMostViewController {
                         DebugActionSheetHelper.showAlert(message: "服务开启失败，不支持发送。请再次尝试......", presentingViewController: topVC)
                     }
                 }
             }
         }else{
             DebugFileTransferServer.shared.uploadTextContent(text)
-            if let topVC = WindowHelper.shared.window.rootViewController?.topMostViewController {
+            if let topVC = window?.rootViewController?.topMostViewController {
                 let address =  DebugFileTransferServer.shared.getCompleteAddress() ?? ""
                 DebugActionSheetHelper.showAlert(message: "发送完成，🌐 服务器地址：\(address)",actions: [UIAlertAction.init(title: "复制链接", style: .default,handler: { _ in
                     UIPasteboard.general.string = address
