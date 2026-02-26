@@ -7,7 +7,7 @@
 
 import UIKit
 
-public class DebugScreenshotManager {
+public class DebugScreenshotManager:NSObject {
     public  static let shared = DebugScreenshotManager()
     /// 当前截屏的视图，用户监听到截图时模拟用户截屏动作
     public var currentSreenshotHandle:(()->UIWindow?)?
@@ -33,6 +33,7 @@ public class DebugScreenshotManager {
             if  let value = DebugKeychainManager.load("debug_open_didTakeScreenshot") {
                 return value == "1"
             }
+            DebugKeychainManager.save("1", forKey: "debug_open_didTakeScreenshot")
             return true
         }
         set{
@@ -51,15 +52,41 @@ public class DebugScreenshotManager {
     private var timer: Timer?
     private var currentInterval:Int = 0
     
-    init() {
+    override init() {
+        super.init()
         currentInterval = autoHideTime
         NotificationCenter.default.addObserver(self, selector: #selector(handleSystemScreenDidChange), name: UIApplication.userDidTakeScreenshotNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(handleScreenDidChange), name: NSNotification.Name(rawValue: "DebugScreenshotManager_screenshotName"), object: nil)
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(handleVideoDidChange), name:  UIScreen.capturedDidChangeNotification, object: nil)
      
     }
     
     public func didScreenshot(){
        self.handleScreenDidChange(notification: NSNotification(name: UIApplication.userDidTakeScreenshotNotification, object: nil))
+    }
+    
+    @objc  func handleVideoDidChange(notification: NSNotification) {
+        guard isEnableSystemMonitoring == true else {return}
+        if UIScreen.main.isCaptured == true { /// 正在录制屏幕
+            
+        }else {
+            /// 可能结束录制
+//            展示 弹框
+            // 2. 更多选项（系统分享）
+            if let topVC =  self.appWindow?.rootViewController?.topMostViewController {
+                let moreAction = ActionItem(title: "快速上传", style: .default) {
+                    let imagePicker = UIImagePickerController()
+                    imagePicker.sourceType = .photoLibrary
+                    imagePicker.delegate = self
+                    imagePicker.allowsEditing = false
+                    imagePicker.mediaTypes = ["public.movie"]
+                    topVC.present(imagePicker, animated: true)
+                }
+                DebugActionSheetHelper.show(actions: [moreAction], presentingViewController: topVC)
+            }
+           
+        }
     }
     
     @objc   func handleSystemScreenDidChange(notification: NSNotification) {
@@ -385,6 +412,107 @@ extension DebugScreenshotManager {
     }
 }
 
+extension DebugScreenshotManager:UIImagePickerControllerDelegate & UINavigationControllerDelegate{
+    public func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        picker.dismiss(animated: true) { [weak self] in
+            self?.handleSelectedMedia(info: info)
+        }
+    }
+    
+    public func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        picker.dismiss(animated: true)
+    }
+    
+    private func handleSelectedMedia(info: [UIImagePickerController.InfoKey : Any]) {
+        guard let  topVC = self.appWindow?.rootViewController?.topMostViewController else { return }
+        // 显示上传进度
+        let progressAlert = UIAlertController(title: "正在处理文件", message: "请稍候...", preferredStyle: .alert)
+        topVC.present(progressAlert, animated: true)
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var fileName: String = ""
+            var fileData: Data?
+            
+            // 处理图片
+            if let image = info[.originalImage] as? UIImage {
+                fileName = DebugFileTransferServer.shared.imageName()
+                fileData = image.jpegData(compressionQuality: 0.8)
+                 DebugFileTransferServer.shared.log("web_test📷 处理图片: \(fileName), 原始尺寸: \(image.size), 数据大小: \(fileData?.count ?? 0) bytes")
+            }
+            // 处理视频
+            else if let videoURL = info[.mediaURL] as? URL {
+                fileName = "视频_\(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .medium)).\(videoURL.pathExtension)"
+                do {
+                    fileData = try Data(contentsOf: videoURL)
+                     DebugFileTransferServer.shared.log("web_test🎥 处理视频: \(fileName), 数据大小: \(fileData?.count ?? 0) bytes")
+                } catch {
+                     DebugFileTransferServer.shared.log("web_test❌ 读取视频失败: \(error)")
+                    DispatchQueue.main.async {
+                        progressAlert.dismiss(animated: true) {
+                            self?.showAlert(title: "错误", message: "读取视频文件失败: \(error.localizedDescription)")
+                        }
+                    }
+                    return
+                }
+            }
+            
+            guard let data = fileData else {
+                DispatchQueue.main.async {
+                    progressAlert.dismiss(animated: true) {
+                        self?.showAlert(title: "错误", message: "无法处理选择的文件")
+                    }
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                if  DebugFileTransferServer.shared.isRunning {
+                    DebugFileTransferServer.shared.uploadFile(name: fileName, data: data)
+                    let address = DebugFileTransferServer.shared.getCompleteAddress() ?? ""
+                    progressAlert.dismiss(animated: true) {
+                        self?.showAlert(title: "上传成功,🌐 服务器地址：\(address)", message: "文件 \(fileName) 已上传到服务器\n大小: \(self?.formatFileSize(data.count) ?? "未知")") {
+                            UIPasteboard.general.string = address
+                        }
+                    }
+                }else{
+                    DebugFileTransferServer.shared.startServer {[weak self] success, address in
+                        if success, let address = address {
+                            // 上传文件
+                            DebugFileTransferServer.shared.uploadFile(name: fileName, data: data)
+                            let address = DebugFileTransferServer.shared.getCompleteAddress() ?? ""
+                            progressAlert.dismiss(animated: true) {
+                                self?.showAlert(title: "上传成功,🌐 服务器地址：\(address)", message: "文件 \(fileName) 已上传到服务器\n大小: \(self?.formatFileSize(data.count) ?? "未知")") {
+                                    UIPasteboard.general.string = address
+                                }
+                            }
+                        }else {
+                            let address = DebugFileTransferServer.shared.getCompleteAddress() ?? ""
+                            progressAlert.dismiss(animated: true) {
+                                self?.showAlert(title: "服务开启失败，不支持发送。请再次尝试......", message: "")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func showAlert(title: String, message: String, completion: (() -> Void)? = nil) {
+        guard let  topvc = self.appWindow?.rootViewController?.topMostViewController else { return }
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
+            completion?()
+        })
+        topvc.present(alert, animated: true)
+    }
+    
+    private func formatFileSize(_ bytes: Int) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(bytes))
+    }
+ 
+}
 
 extension UIViewController {
     
@@ -405,4 +533,5 @@ extension UIViewController {
         return self
     }
 }
+
 
