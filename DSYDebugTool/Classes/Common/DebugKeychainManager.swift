@@ -15,7 +15,7 @@ public class DebugKeychainManager {
     public static func save(_ value: String, forKey key: String) -> Bool {
         // 删除已有值
         if exists(key) {
-            update(value, forKey: key)
+            return  update(value, forKey: key)
         }
 //        delete(key)
         
