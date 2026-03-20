@@ -78,8 +78,9 @@ public class DebugFileUploadViewController: UIViewController, UIImagePickerContr
         serverAddressLabel.textAlignment = .center
         serverAddressLabel.textColor = .systemBlue
         serverAddressLabel.numberOfLines = 0
+        serverAddressLabel.isUserInteractionEnabled = true
         contentView.addSubview(serverAddressLabel)
-        
+        serverAddressLabel.addGestureRecognizer(UITapGestureRecognizer.init(target: self, action: #selector(serverLableClick)))
         // 说明信息
         infoLabel.text = """
         选择要上传的文件类型：
@@ -234,6 +235,14 @@ public class DebugFileUploadViewController: UIViewController, UIImagePickerContr
     @objc private func uploadText() {
         showTextInputAlert()
     }
+    
+    @objc private func serverLableClick() {
+        let ipAddress = DebugFileTransferServer.shared.getCompleteAddress()
+        showAlert(title: "🌐 服务器复制成功", message: ipAddress ?? "") {
+            UIPasteboard.general.string = ipAddress
+        }
+    }
+    
     
     private func showTextInputAlert() {
         let alertController = UIAlertController(title: "上传文字", message: "输入要上传的文字内容", preferredStyle: .alert)
