@@ -27,10 +27,12 @@ public class DebugFileTransferServer: NSObject {
     private var appDisplayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? ""
   
     private var uploadedFiles: [(name: String, data: Data, uploadTime: Date)] = []
-    /// Web 端上传图片到 App 的大小限制（字节），可在 App 侧按需覆盖
-    public var webImageUploadMaxSizeBytes: Int = 100 * 1024 * 1024
+    /// Web 端上传图片到 App 的大小限制（字节），默认 20MB，可在 App 侧按需覆盖
+    public var webImageUploadMaxSizeBytes: Int = 20 * 1024 * 1024
+    /// Web 端上传任意文件到 App 的大小限制（字节），默认 20MB，可在 App 侧按需覆盖
+    public var webFileUploadMaxSizeBytes: Int = 20 * 1024 * 1024
     /// Web 端上传文本到 App 的大小限制（字节）
-    private var webTextUploadMaxSizeBytes: Int = 100 * 1024 * 1024
+    private let webTextUploadMaxSizeBytes: Int = 20 * 1024 * 1024
     
     override init() {
         super.init()
@@ -166,6 +168,15 @@ public class DebugFileTransferServer: NSObject {
                 return
             }
             completion(self.handleWebImageUpload(request: dataRequest))
+        }
+        
+        // Web 端上传到 App（任意文件：txt/word/pdf...）
+        webServer?.addHandler(forMethod: "POST", path: "/api/upload-file", request: GCDWebServerDataRequest.self) { [weak self] request, completion in
+            guard let self = self, let dataRequest = request as? GCDWebServerDataRequest else {
+                completion(GCDWebServerErrorResponse(statusCode: 500))
+                return
+            }
+            completion(self.handleWebFileUpload(request: dataRequest))
         }
         
         // 启动服务器（端口占用时自动顺延）
@@ -435,6 +446,15 @@ public class DebugFileTransferServer: NSObject {
             log("❌ Web文本上传过大: \(text.utf8.count)")
             return jsonResponse(code: 400, message: "文本过大，最大支持20MB")
         }
+        
+        if let image = decodeBase64Image(from: text) {
+            log("✅ Web文本识别为 base64 图片，按图片处理")
+            DispatchQueue.main.async { [weak self] in
+                self?.presentReceivedImageAlert(image: image)
+            }
+            return jsonResponse(message: "检测到base64图片，已按图片发送到App")
+        }
+        
         log("✅ Web文本上传成功，长度: \(text.count)")
         
         DispatchQueue.main.async { [weak self] in
@@ -484,6 +504,47 @@ public class DebugFileTransferServer: NSObject {
             self?.presentReceivedImageAlert(image: image)
         }
         return jsonResponse(message: "图片已发送到App")
+    }
+    
+    private func handleWebFileUpload(request: GCDWebServerDataRequest) -> GCDWebServerResponse {
+        log("⬆️ Web文件上传，请求大小: \(request.data.count)")
+        guard let json = try? JSONSerialization.jsonObject(with: request.data) as? [String: Any] else {
+            log("❌ Web文件上传 JSON 解析失败")
+            return jsonResponse(code: 400, message: "JSON格式错误")
+        }
+        
+        let fileName = (json["fileName"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let mimeType = (json["mimeType"] as? String ?? "application/octet-stream").trimmingCharacters(in: .whitespacesAndNewlines)
+        let base64OrDataURL = (json["fileData"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !fileName.isEmpty else {
+            return jsonResponse(code: 400, message: "文件名不能为空")
+        }
+        guard !base64OrDataURL.isEmpty else {
+            return jsonResponse(code: 400, message: "文件数据不能为空")
+        }
+        
+        let base64String: String
+        if let commaIndex = base64OrDataURL.firstIndex(of: ","),
+           base64OrDataURL[..<commaIndex].contains("base64") {
+            base64String = String(base64OrDataURL[base64OrDataURL.index(after: commaIndex)...])
+        } else {
+            base64String = base64OrDataURL
+        }
+        
+        guard let fileData = Data(base64Encoded: base64String), !fileData.isEmpty else {
+            return jsonResponse(code: 400, message: "文件数据解析失败")
+        }
+        
+        if fileData.count > webFileUploadMaxSizeBytes {
+            return jsonResponse(code: 400, message: "文件过大，最大支持20MB")
+        }
+        
+        log("✅ Web文件上传成功: \(fileName), size=\(fileData.count), mime=\(mimeType)")
+        DispatchQueue.main.async { [weak self] in
+            self?.presentReceivedFileAlert(fileName: fileName, mimeType: mimeType, data: fileData)
+        }
+        return jsonResponse(message: "文件已发送到App")
     }
     
     private func jsonResponse(code: Int = 0, message: String) -> GCDWebServerResponse {
@@ -558,6 +619,65 @@ public class DebugFileTransferServer: NSObject {
         }))
         alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
         topVC.present(alert, animated: true)
+    }
+    
+    private func presentReceivedFileAlert(fileName: String, mimeType: String, data: Data) {
+        guard let topVC = topMostViewController() else { return }
+        if topVC.presentedViewController is UIAlertController { return }
+        
+        let message = """
+        文件名：\(fileName)
+        类型：\(mimeType)
+        大小：\(formatFileSize(data.count))
+        """
+        let alert = UIAlertController(title: "收到网页文件", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "保存到文件", style: .default, handler: { [weak self] _ in
+            self?.saveFileToFiles(fileName: fileName, data: data)
+        }))
+        alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
+        topVC.present(alert, animated: true)
+    }
+    
+    private func saveFileToFiles(fileName: String, data: Data) {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent(fileName)
+        do {
+            try FileManager.default.createDirectory(at: tempURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: tempURL, options: .atomic)
+        } catch {
+            presentSimpleTip(title: "保存失败", message: error.localizedDescription)
+            return
+        }
+        
+        guard let topVC = topMostViewController() else { return }
+        if #available(iOS 14.0, *) {
+            let picker = UIDocumentPickerViewController(forExporting: [tempURL], asCopy: true)
+            topVC.present(picker, animated: true)
+        } else {
+            let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+            topVC.present(activityVC, animated: true)
+        }
+    }
+    
+    private func decodeBase64Image(from text: String) -> UIImage? {
+        let input = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if input.isEmpty { return nil }
+        
+        let base64: String
+        if let commaIndex = input.firstIndex(of: ","),
+           input[..<commaIndex].contains("base64") {
+            base64 = String(input[input.index(after: commaIndex)...])
+        } else {
+            base64 = input
+        }
+        
+        guard base64.count > 128, // 避免把普通短文本误判
+              let data = Data(base64Encoded: base64),
+              let image = UIImage(data: data) else {
+            return nil
+        }
+        return image
     }
     
     private func saveImageToAlbum(image: UIImage) {
@@ -719,17 +839,20 @@ public class DebugFileTransferServer: NSObject {
                 .history-image { max-width:140px; max-height:90px; border-radius:6px; display:block; margin-top:8px; border:1px solid #eee; }
                 .tiny-tip { font-size:12px; color:#666; margin-top:8px; }
                 .status-tip { font-size:13px; margin-top:10px; color:#007AFF; }
-                .debug-log-card { border:1px dashed #cfd8dc; border-radius:10px; padding:12px; margin-top:14px; background:#fafcff; }
-                .debug-log-header { display:flex; justify-content:space-between; align-items:center; }
-                .debug-log-box { margin-top:8px; height:160px; overflow:auto; background:#111; color:#d6f5d6; font-family: Menlo, Monaco, monospace; font-size:12px; padding:8px; border-radius:8px; white-space: pre-wrap; word-break: break-word; }
+                .debug-log-card { display: none; }
+                .debug-log-header { display:none; }
+                .debug-log-box { display:none; }
+                .drop-zone { margin-top: 10px; border: 2px dashed #90caf9; border-radius: 8px; padding: 22px 14px; min-height: 120px; color: #1976d2; background: #f5fbff; text-align: center; font-size: 13px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+                .drop-zone.active { border-color: #007AFF; background: #eaf4ff; }
+                .btn-disabled { opacity: 0.45; cursor: not-allowed; }
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>📱 \(appDisplayName) 文件接收站</h1>
+                <h1>📱 \(appDisplayName) 文件传输站</h1>
                 <div class="top-nav">
                     <button id="tabReceive" type="button" class="tab-btn active" onclick="switchTab('receive')">📥 接收站</button>
-                    <button id="tabUpload" type="button" class="tab-btn" onclick="switchTab('upload')">⬆️ 上传到App</button>
+                    <button id="tabUpload" type="button" class="tab-btn" onclick="switchTab('upload')">⬆️ 上传站</button>
                 </div>
                 <div id="panelReceive" class="panel active">
                 
@@ -778,8 +901,9 @@ public class DebugFileTransferServer: NSObject {
                 <div id="panelUpload" class="panel">
                     <div class="info">
                         <strong>📤 上传到App</strong><br>
-                        • 支持发送文本或图片到手机 App<br>
-                        • App 收到后会立刻弹框：文本可复制，图片可添加到相册<br>
+                        • 此页面用于向\(appDisplayName)应用发送的文件<br>
+                        • 支持发送文本、图片、文件到手机 App<br>
+                        • App 收到后会立刻弹框：文本可复制，图片可添加到相册，文件可保存到系统文件中<br>
                         • 支持历史记录、编辑、预览、再次发送
                     </div>
                     
@@ -788,6 +912,7 @@ public class DebugFileTransferServer: NSObject {
                         <div class="upload-row">
                             <button type="button" class="upload-btn secondary" id="typeTextBtn" onclick="setUploadType('text')">📝 文本</button>
                             <button type="button" class="upload-btn secondary" id="typeImageBtn" onclick="setUploadType('image')">🖼️ 图片</button>
+                            <button type="button" class="upload-btn secondary" id="typeFileBtn" onclick="setUploadType('file')">📄 文件</button>
                         </div>
                         
                         <div id="textEditorWrap" style="margin-top:12px;">
@@ -796,7 +921,14 @@ public class DebugFileTransferServer: NSObject {
                         
                         <div id="imageEditorWrap" style="display:none; margin-top:12px;">
                             <input id="imageInput" type="file" accept="image/*" onchange="onSelectImage(event)" />
+                            <div id="imageDropZone" class="drop-zone">将图片拖到这里，松开后自动上传</div>
                             <img id="imagePreview" class="history-image" style="display:none; max-width: 260px; max-height: 180px;" />
+                        </div>
+                        
+                        <div id="fileEditorWrap" style="display:none; margin-top:12px;">
+                            <input id="fileInput" type="file" accept=".txt,.pdf,.doc,.docx,.rtf,.md,.json,.csv,.xls,.xlsx,.ppt,.pptx" onchange="onSelectAnyFile(event)" />
+                            <div id="fileDropZone" class="drop-zone">将 txt / word / pdf 等文件拖到这里，松开后自动上传</div>
+                            <div id="fileInfo" class="tiny-tip"></div>
                         </div>
                         
                         <div class="upload-row">
@@ -806,18 +938,12 @@ public class DebugFileTransferServer: NSObject {
                         <div id="sendStatus" class="status-tip"></div>
                         <div class="tiny-tip">历史保存在当前浏览器 LocalStorage。</div>
                         
-                        <div class="debug-log-card">
-                            <div class="debug-log-header">
-                                <strong>调试日志</strong>
-                                <button type="button" class="upload-btn secondary" onclick="clearDebugLog()">清空日志</button>
-                            </div>
-                            <div id="debugLogBox" class="debug-log-box"></div>
-                        </div>
+                        
                     </div>
                     
                     <div class="upload-card">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <strong>历史记录</strong>
+                            <strong>上传记录</strong>
                             <button type="button" class="upload-btn secondary" onclick="clearHistory()">清空历史</button>
                         </div>
                         <div id="historyList"></div>
@@ -839,22 +965,20 @@ public class DebugFileTransferServer: NSObject {
             </div>
             
             <script>
-                let uploadType = 'text';
-                let selectedImageDataUrl = '';
-                let editingHistoryId = '';
+                var uploadType = 'text';
+                var selectedImageDataUrl = '';
+                var selectedFileBase64 = '';
+                var selectedFileName = '';
+                var selectedFileMimeType = '';
+                var editingHistoryId = '';
                 const HISTORY_KEY = 'dsy_debug_upload_history_v1';
                 
                 function logDebug(msg) {
-                    const box = document.getElementById('debugLogBox');
-                    if (!box) return;
-                    const ts = new Date().toLocaleTimeString();
-                    box.textContent += '[' + ts + '] ' + msg + '\\n';
-                    box.scrollTop = box.scrollHeight;
+                    // 调试日志已禁用
                 }
                 
                 function clearDebugLog() {
-                    const box = document.getElementById('debugLogBox');
-                    if (box) box.textContent = '';
+                    // 调试日志已禁用
                 }
                 
                 window.addEventListener('error', function(e) {
@@ -1000,24 +1124,126 @@ public class DebugFileTransferServer: NSObject {
                     logDebug('set upload type: ' + type);
                     uploadType = type;
                     const isText = type === 'text';
+                    const isImage = type === 'image';
+                    const isFile = type === 'file';
                     document.getElementById('textEditorWrap').style.display = isText ? 'block' : 'none';
-                    document.getElementById('imageEditorWrap').style.display = isText ? 'none' : 'block';
+                    document.getElementById('imageEditorWrap').style.display = isImage ? 'block' : 'none';
+                    document.getElementById('fileEditorWrap').style.display = isFile ? 'block' : 'none';
                     document.getElementById('typeTextBtn').style.opacity = isText ? '1' : '0.7';
-                    document.getElementById('typeImageBtn').style.opacity = isText ? '0.7' : '1';
+                    document.getElementById('typeImageBtn').style.opacity = isImage ? '1' : '0.7';
+                    document.getElementById('typeFileBtn').style.opacity = isFile ? '1' : '0.7';
                 }
                 
                 function onSelectImage(event) {
                     const file = event.target.files && event.target.files[0];
                     if (!file) return;
                     logDebug('select image: ' + file.name + ', size=' + file.size);
-                    const reader = new FileReader();
+                    loadImageFile(file, false);
+                }
+                
+                function loadImageFile(file, autoSend) {
+                    var reader = new FileReader();
                     reader.onload = function(e) {
                         selectedImageDataUrl = e.target.result || '';
-                        const preview = document.getElementById('imagePreview');
+                        var preview = document.getElementById('imagePreview');
                         preview.src = selectedImageDataUrl;
                         preview.style.display = selectedImageDataUrl ? 'block' : 'none';
+                        if (autoSend && selectedImageDataUrl) {
+                            logDebug('drop auto send image');
+                            sendPayload('image', '', selectedImageDataUrl, '', '', '', '');
+                        }
                     };
                     reader.readAsDataURL(file);
+                }
+                
+                function onSelectAnyFile(event) {
+                    var file = event.target.files && event.target.files[0];
+                    if (!file) return;
+                    loadAnyFile(file, false);
+                }
+                
+                function loadAnyFile(file, autoSend) {
+                    logDebug('select file: ' + file.name + ', size=' + file.size + ', type=' + (file.type || 'unknown'));
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        var dataUrl = e.target.result || '';
+                        var commaIndex = dataUrl.indexOf(',');
+                        selectedFileBase64 = commaIndex >= 0 ? dataUrl.substring(commaIndex + 1) : dataUrl;
+                        selectedFileName = file.name || ('upload_' + Date.now());
+                        selectedFileMimeType = file.type || 'application/octet-stream';
+                        var fileInfo = document.getElementById('fileInfo');
+                        fileInfo.textContent = '已选择：' + selectedFileName + ' (' + (selectedFileMimeType || 'unknown') + ')';
+                        if (autoSend) {
+                            sendPayload('file', '', '', '', selectedFileName, selectedFileMimeType, selectedFileBase64);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+                
+                function setupDropZone() {
+                    var dropZone = document.getElementById('imageDropZone');
+                    if (!dropZone) return;
+                    
+                    ['dragenter', 'dragover'].forEach(function(eventName) {
+                        dropZone.addEventListener(eventName, function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            dropZone.classList.add('active');
+                        });
+                    });
+                    
+                    ['dragleave', 'drop'].forEach(function(eventName) {
+                        dropZone.addEventListener(eventName, function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            dropZone.classList.remove('active');
+                        });
+                    });
+                    
+                    dropZone.addEventListener('drop', function(e) {
+                        var files = (e.dataTransfer && e.dataTransfer.files) ? e.dataTransfer.files : null;
+                        if (!files || !files.length) {
+                            setStatus('未检测到可上传文件');
+                            return;
+                        }
+                        var file = files[0];
+                        if (!file.type || file.type.indexOf('image/') !== 0) {
+                            setStatus('请拖拽图片文件');
+                            return;
+                        }
+                        setUploadType('image');
+                        logDebug('drop image: ' + file.name + ', size=' + file.size);
+                        loadImageFile(file, true);
+                    });
+                }
+                
+                function setupFileDropZone() {
+                    var dropZone = document.getElementById('fileDropZone');
+                    if (!dropZone) return;
+                    ['dragenter', 'dragover'].forEach(function(eventName) {
+                        dropZone.addEventListener(eventName, function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            dropZone.classList.add('active');
+                        });
+                    });
+                    ['dragleave', 'drop'].forEach(function(eventName) {
+                        dropZone.addEventListener(eventName, function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            dropZone.classList.remove('active');
+                        });
+                    });
+                    dropZone.addEventListener('drop', function(e) {
+                        var files = (e.dataTransfer && e.dataTransfer.files) ? e.dataTransfer.files : null;
+                        if (!files || !files.length) {
+                            setStatus('未检测到可上传文件');
+                            return;
+                        }
+                        var file = files[0];
+                        setUploadType('file');
+                        loadAnyFile(file, true);
+                    });
                 }
                 
                 function findInList(list, predicate) {
@@ -1047,23 +1273,138 @@ public class DebugFileTransferServer: NSObject {
                 }
                 
                 function setHistory(list) {
-                    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+                    setHistoryWithQuota(list);
+                }
+                
+                function setHistoryWithQuota(list) {
+                    var candidate = list.slice();
+                    while (candidate.length >= 0) {
+                        try {
+                            localStorage.setItem(HISTORY_KEY, JSON.stringify(candidate));
+                            return true;
+                        } catch (e) {
+                            if (candidate.length === 0) {
+                                logDebug('setHistory failed: quota exceeded and no removable records');
+                                return false;
+                            }
+                            // 先移除最旧记录（列表本身是按 updatedAt 倒序）
+                            var removed = candidate.pop();
+                            logDebug('quota exceeded, remove oldest history id=' + (removed && removed.id ? removed.id : 'unknown'));
+                        }
+                    }
+                    return false;
+                }
+                
+                function payloadLength(item) {
+                    if (!item) return 0;
+                    var textLen = (item.text || '').length;
+                    var imageLen = (item.imageDataUrl || '').length;
+                    var fileLen = (item.fileDataBase64 || '').length;
+                    return textLen + imageLen + fileLen;
+                }
+                
+                function degradeItemForStorage(item) {
+                    var cloned = JSON.parse(JSON.stringify(item || {}));
+                    var type = cloned.type || 'text';
+                    if (type === 'image') {
+                        cloned.imageDataUrl = '';
+                    } else if (type === 'file') {
+                        cloned.fileDataBase64 = '';
+                    }
+                    cloned.storagePayloadOmitted = true;
+                    cloned.storageOmitReason = 'payload_too_large_for_local_storage';
+                    return cloned;
+                }
+                
+                function getHistoryFingerprint(item) {
+                    var type = item && item.type ? item.type : 'text';
+                    if (type === 'image') {
+                        var imageData = item && item.imageDataUrl ? item.imageDataUrl : '';
+                        return 'image:' + imageData;
+                    }
+                    if (type === 'file') {
+                        var fileData = item && item.fileDataBase64 ? item.fileDataBase64 : '';
+                        return 'file:' + fileData;
+                    }
+                    var text = item && item.text ? item.text : '';
+                    return 'text:' + text;
                 }
                 
                 function saveHistory(item) {
                     var list = getHistory();
-                    if (item.id) {
+                    var fingerprint = getHistoryFingerprint(item);
+                    var now = Date.now();
+                    item.updatedAt = now;
+                    
+                    var sameContentIdx = findIndexInList(list, function(x) {
+                        return getHistoryFingerprint(x) === fingerprint;
+                    });
+                    
+                    if (sameContentIdx >= 0) {
+                        var existed = list[sameContentIdx];
+                        item.id = existed.id || item.id || ('h_' + now + '_' + Math.random().toString(36).slice(2, 8));
+                        item.createdAt = existed.createdAt || item.createdAt || now;
+                        list[sameContentIdx] = item;
+                    } else if (item.id) {
                         var idx = findIndexInList(list, function(x) { return x.id === item.id; });
                         if (idx >= 0) {
+                            item.createdAt = list[idx].createdAt || item.createdAt || now;
                             list[idx] = item;
                         } else {
-                            list.unshift(item);
+                            item.createdAt = item.createdAt || now;
+                            list.push(item);
                         }
                     } else {
-                        item.id = 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-                        list.unshift(item);
+                        item.id = 'h_' + now + '_' + Math.random().toString(36).slice(2, 8);
+                        item.createdAt = item.createdAt || now;
+                        list.push(item);
                     }
-                    setHistory(list);
+                    
+                    // 二次去重（防历史脏数据），同内容只保留更新时间最新的一条
+                    var dedupMap = {};
+                    for (var i = 0; i < list.length; i++) {
+                        var current = list[i];
+                        var key = getHistoryFingerprint(current);
+                        if (!dedupMap[key]) {
+                            dedupMap[key] = current;
+                        } else {
+                            var existItem = dedupMap[key];
+                            var existUpdatedAt = existItem.updatedAt || 0;
+                            var currentUpdatedAt = current.updatedAt || 0;
+                            if (currentUpdatedAt > existUpdatedAt) {
+                                dedupMap[key] = current;
+                            }
+                        }
+                    }
+                    
+                    var deduped = [];
+                    for (var k in dedupMap) {
+                        if (Object.prototype.hasOwnProperty.call(dedupMap, k)) {
+                            deduped.push(dedupMap[k]);
+                        }
+                    }
+                    
+                    // 按更新时间倒序
+                    deduped.sort(function(a, b) {
+                        return (b.updatedAt || 0) - (a.updatedAt || 0);
+                    });
+                    
+                    // 先尝试完整保存；失败后降级当前记录 payload 再保存
+                    var saved = setHistoryWithQuota(deduped);
+                    if (!saved) {
+                        var indexCurrent = findIndexInList(deduped, function(x) { return x.id === item.id; });
+                        if (indexCurrent >= 0) {
+                            deduped[indexCurrent] = degradeItemForStorage(deduped[indexCurrent]);
+                            deduped[indexCurrent].updatedAt = now;
+                            deduped.sort(function(a, b) {
+                                return (b.updatedAt || 0) - (a.updatedAt || 0);
+                            });
+                            saved = setHistoryWithQuota(deduped);
+                        }
+                    }
+                    if (!saved) {
+                        setStatus('历史记录存储空间不足，已自动清理旧记录');
+                    }
                     renderHistory();
                 }
                 
@@ -1081,16 +1422,26 @@ public class DebugFileTransferServer: NSObject {
                         return;
                     }
                     host.innerHTML = list.map(function(item) {
-                        var title = item.type === 'text' ? '📝 文本' : '🖼️ 图片';
-                        var preview = item.type === 'text'
-                            ? '<div class="history-preview">' + escapeHtml(item.text || '') + '</div>'
-                            : ((item.imageDataUrl || '') ? '<img class="history-image" src="' + item.imageDataUrl + '" />' : '<div class="tiny-tip">图片已失效</div>');
+                        var title = item.type === 'text' ? '📝 文本' : (item.type === 'image' ? '🖼️ 图片' : '📄 文件');
+                        var preview = '';
+                        if (item.type === 'text') {
+                            preview = '<div class="history-preview">' + escapeHtml(item.text || '') + '</div>';
+                        } else if (item.type === 'image') {
+                            preview = (item.imageDataUrl || '') ? '<img class="history-image" src="' + item.imageDataUrl + '" />' : '<div class="tiny-tip">图片数据未缓存（仍可再次上传新内容）</div>';
+                        } else {
+                            preview = '<div class="history-preview">文件：' + escapeHtml(item.fileName || '未知文件') + '<br/>类型：' + escapeHtml(item.fileMimeType || 'application/octet-stream') + '</div>';
+                        }
+                        var omitTip = item.storagePayloadOmitted ? '<div class="tiny-tip">⚠️ 此记录数据过大，仅保留元信息，复制/预览/重发不可用</div>' : '';
                         var time = new Date(item.updatedAt || item.createdAt || Date.now()).toLocaleString();
                         return '<div class="history-item">' +
                             '<div class="history-meta">' + title + ' • ' + time + '</div>' +
                             preview +
+                            omitTip +
                             '<div class="upload-row">' +
-                            '<button class="upload-btn secondary" data-act="edit" data-id="' + escapeAttr(item.id) + '">修改</button>' +
+                            '<button class="upload-btn secondary" data-act="copy" data-id="' + escapeAttr(item.id) + '">复制</button>' +
+                            ((item.type === 'text')
+                                ? '<button class="upload-btn secondary" data-act="edit" data-id="' + escapeAttr(item.id) + '">修改</button>'
+                                : '<button class="upload-btn secondary btn-disabled" data-act="edit-disabled" data-id="' + escapeAttr(item.id) + '">修改</button>') +
                             '<button class="upload-btn" data-act="resend" data-id="' + escapeAttr(item.id) + '">再次发送</button>' +
                             '<button class="upload-btn warn" data-act="preview" data-id="' + escapeAttr(item.id) + '">预览</button>' +
                             '</div></div>';
@@ -1103,7 +1454,11 @@ public class DebugFileTransferServer: NSObject {
                     var action = target.getAttribute('data-act');
                     var id = target.getAttribute('data-id');
                     if (!action || !id) return;
-                    if (action === 'edit') {
+                    if (action === 'copy') {
+                        copyHistory(id);
+                    } else if (action === 'edit-disabled') {
+                        setStatus('仅文字类型支持修改');
+                    } else if (action === 'edit') {
                         editHistory(id);
                     } else if (action === 'resend') {
                         resendHistory(id);
@@ -1120,11 +1475,16 @@ public class DebugFileTransferServer: NSObject {
                     setUploadType(item.type || 'text');
                     if ((item.type || 'text') === 'text') {
                         document.getElementById('textInput').value = item.text || '';
-                    } else {
+                    } else if ((item.type || 'text') === 'image') {
                         selectedImageDataUrl = item.imageDataUrl || '';
                         const preview = document.getElementById('imagePreview');
                         preview.src = selectedImageDataUrl;
                         preview.style.display = selectedImageDataUrl ? 'block' : 'none';
+                    } else {
+                        selectedFileBase64 = item.fileDataBase64 || '';
+                        selectedFileName = item.fileName || '';
+                        selectedFileMimeType = item.fileMimeType || 'application/octet-stream';
+                        document.getElementById('fileInfo').textContent = selectedFileName ? ('已选择：' + selectedFileName + ' (' + selectedFileMimeType + ')') : '';
                     }
                     setStatus('已载入历史记录，可直接修改后发送');
                 }
@@ -1133,18 +1493,201 @@ public class DebugFileTransferServer: NSObject {
                     logDebug('preview history: ' + id);
                     var item = findInList(getHistory(), function(x) { return x.id === id; });
                     if (!item) return;
-                    if ((item.type || 'text') === 'text') {
-                        alert(item.text || '(空文本)');
-                    } else if (item.imageDataUrl) {
-                        window.open(item.imageDataUrl, '_blank');
+                    if (item.storagePayloadOmitted) {
+                        setStatus('该记录数据未缓存，无法预览');
+                        return;
                     }
+                    if ((item.type || 'text') === 'text') {
+                        showHistoryTextPreview(item.text || '(空文本)');
+                    } else if ((item.type || 'text') === 'image' && item.imageDataUrl) {
+                        showDataImagePreview(item.imageDataUrl);
+                    } else if ((item.type || 'text') === 'file') {
+                        showHistoryFilePreview(item);
+                    }
+                }
+                
+                function showDataImagePreview(dataUrl) {
+                    var modal = document.getElementById('previewModal');
+                    var title = document.getElementById('previewTitle');
+                    var body = document.getElementById('previewBody');
+                    title.textContent = '预览: 历史图片';
+                    body.innerHTML = '<img src="' + dataUrl + '" class="preview-image" alt="history-image" onerror="handlePreviewError()">';
+                    modal.classList.add('active');
+                }
+                
+                function showHistoryTextPreview(text) {
+                    var modal = document.getElementById('previewModal');
+                    var title = document.getElementById('previewTitle');
+                    var body = document.getElementById('previewBody');
+                    title.textContent = '预览: 历史文本';
+                    body.innerHTML = '<div class="preview-text">' + escapeHtml(text || '') + '</div>';
+                    modal.classList.add('active');
+                }
+                
+                function showHistoryFilePreview(item) {
+                    var fileName = item.fileName || 'unknown';
+                    var mimeType = item.fileMimeType || 'application/octet-stream';
+                    var fileBase64 = item.fileDataBase64 || '';
+                    if (!fileBase64) {
+                        setStatus('预览失败：文件数据为空');
+                        return;
+                    }
+                    var ext = '';
+                    var dotIdx = fileName.lastIndexOf('.');
+                    if (dotIdx >= 0 && dotIdx < fileName.length - 1) {
+                        ext = fileName.substring(dotIdx + 1).toLowerCase();
+                    }
+                    var dataUrl = 'data:' + mimeType + ';base64,' + fileBase64;
+                    var modal = document.getElementById('previewModal');
+                    var title = document.getElementById('previewTitle');
+                    var body = document.getElementById('previewBody');
+                    title.textContent = '预览: ' + fileName;
+                    
+                    var isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].indexOf(ext) >= 0 || mimeType.indexOf('image/') === 0;
+                    var isVideo = ['mp4', 'mov', 'webm'].indexOf(ext) >= 0 || mimeType.indexOf('video/') === 0;
+                    var isPdf = ext === 'pdf' || mimeType === 'application/pdf';
+                    var isText = ['txt', 'json', 'md', 'csv', 'log', 'xml', 'html', 'js', 'css', 'swift'].indexOf(ext) >= 0
+                        || mimeType.indexOf('text/') === 0
+                        || mimeType.indexOf('json') >= 0;
+                    
+                    if (isImage) {
+                        body.innerHTML = '<img src="' + dataUrl + '" class="preview-image" alt="' + escapeHtml(fileName) + '" onerror="handlePreviewError()">';
+                    } else if (isVideo) {
+                        body.innerHTML = '<video src="' + dataUrl + '" class="preview-video" controls autoplay></video>';
+                    } else if (isPdf) {
+                        body.innerHTML = '<iframe src="' + dataUrl + '" class="preview-pdf"></iframe>';
+                    } else if (isText) {
+                        var decodedText = decodeBase64ToUtf8(fileBase64);
+                        if (decodedText === null) {
+                            body.innerHTML = '<div class="preview-unsupported"><div class="emoji">❌</div><h3>文本解码失败</h3><p>可复制 base64 后自行处理</p></div>';
+                        } else {
+                            body.innerHTML = '<div class="preview-text">' + escapeHtml(decodedText) + '</div>';
+                        }
+                    } else {
+                        body.innerHTML = '<div class="preview-unsupported"><div class="emoji">📄</div><h3>暂不支持在线预览此文件</h3><p>文件类型: .' + escapeHtml(ext || 'unknown') + '</p><p>请下载后查看</p></div>';
+                    }
+                    modal.classList.add('active');
+                }
+                
+                function decodeBase64ToUtf8(base64) {
+                    try {
+                        var binary = atob(base64);
+                        var escaped = '';
+                        for (var i = 0; i < binary.length; i++) {
+                            var c = binary.charCodeAt(i).toString(16);
+                            if (c.length < 2) c = '0' + c;
+                            escaped += '%' + c;
+                        }
+                        return decodeURIComponent(escaped);
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                
+                function copyTextCompat(text, callback) {
+                    try {
+                        var value = String(text || '');
+                        if (!value) {
+                            callback('内容为空');
+                            return;
+                        }
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(value).then(function() {
+                                callback(null);
+                            }).catch(function() {
+                                fallbackCopyText(value, callback);
+                            });
+                            return;
+                        }
+                        fallbackCopyText(value, callback);
+                    } catch (e) {
+                        callback((e && e.message) || '复制失败');
+                    }
+                }
+                
+                function fallbackCopyText(text, callback) {
+                    try {
+                        var textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        textarea.style.position = 'fixed';
+                        textarea.style.left = '-9999px';
+                        document.body.appendChild(textarea);
+                        textarea.focus();
+                        textarea.select();
+                        var ok = document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        callback(ok ? null : '浏览器不支持复制');
+                    } catch (e) {
+                        callback((e && e.message) || '复制失败');
+                    }
+                }
+                
+                function copyHistory(id) {
+                    logDebug('copy history: ' + id);
+                    var item = findInList(getHistory(), function(x) { return x.id === id; });
+                    if (!item) {
+                        setStatus('复制失败：未找到记录');
+                        return;
+                    }
+                    if (item.storagePayloadOmitted) {
+                        setStatus('复制失败：该记录数据未缓存');
+                        return;
+                    }
+                    
+                    if ((item.type || 'text') === 'text') {
+                        copyTextCompat(item.text || '', function(err) {
+                            if (err) {
+                                setStatus('复制失败：' + err);
+                            } else {
+                                setStatus('复制成功');
+                            }
+                        });
+                        return;
+                    }
+                    if ((item.type || 'text') === 'file') {
+                        var fileBase64 = item.fileDataBase64 || '';
+                        if (!fileBase64) {
+                            setStatus('复制失败：文件数据为空');
+                            return;
+                        }
+                        copyTextCompat(fileBase64, function(err) {
+                            if (err) {
+                                setStatus('复制失败：' + err);
+                            } else {
+                                setStatus('文件 base64 已复制');
+                            }
+                        });
+                        return;
+                    }
+                    
+                    var imageDataUrl = item.imageDataUrl || '';
+                    if (!imageDataUrl) {
+                        setStatus('复制失败：图片数据为空');
+                        return;
+                    }
+                    var base64Content = imageDataUrl;
+                    var commaIdx = imageDataUrl.indexOf(',');
+                    if (commaIdx >= 0) {
+                        base64Content = imageDataUrl.substring(commaIdx + 1);
+                    }
+                    copyTextCompat(base64Content, function(err) {
+                        if (err) {
+                            setStatus('复制失败：' + err);
+                        } else {
+                            setStatus('图片 base64 已复制');
+                        }
+                    });
                 }
                 
                 function resendHistory(id) {
                     logDebug('resend history: ' + id);
                     var item = findInList(getHistory(), function(x) { return x.id === id; });
                     if (!item) return;
-                    sendPayload(item.type || 'text', item.text || '', item.imageDataUrl || '', id);
+                    if (item.storagePayloadOmitted) {
+                        setStatus('该记录数据未缓存，无法重新发送');
+                        return;
+                    }
+                    sendPayload(item.type || 'text', item.text || '', item.imageDataUrl || '', id, item.fileName || '', item.fileMimeType || 'application/octet-stream', item.fileDataBase64 || '');
                 }
                 
                 function clearEditor() {
@@ -1152,10 +1695,15 @@ public class DebugFileTransferServer: NSObject {
                     editingHistoryId = '';
                     document.getElementById('textInput').value = '';
                     document.getElementById('imageInput').value = '';
+                    document.getElementById('fileInput').value = '';
                     selectedImageDataUrl = '';
+                    selectedFileBase64 = '';
+                    selectedFileName = '';
+                    selectedFileMimeType = '';
                     var preview = document.getElementById('imagePreview');
                     preview.src = '';
                     preview.style.display = 'none';
+                    document.getElementById('fileInfo').textContent = '';
                     setStatus('已清空输入内容');
                 }
                 
@@ -1172,13 +1720,19 @@ public class DebugFileTransferServer: NSObject {
                             setStatus('请输入文本后再发送');
                             return;
                         }
-                        sendPayload('text', text, '', editingHistoryId);
-                    } else {
+                        sendPayload('text', text, '', editingHistoryId, '', '', '');
+                    } else if (uploadType === 'image') {
                         if (!selectedImageDataUrl) {
                             setStatus('请先选择图片');
                             return;
                         }
-                        sendPayload('image', '', selectedImageDataUrl, editingHistoryId);
+                        sendPayload('image', '', selectedImageDataUrl, editingHistoryId, '', '', '');
+                    } else {
+                        if (!selectedFileBase64 || !selectedFileName) {
+                            setStatus('请先选择文件');
+                            return;
+                        }
+                        sendPayload('file', '', '', editingHistoryId, selectedFileName, selectedFileMimeType, selectedFileBase64);
                     }
                 }
                 
@@ -1194,13 +1748,20 @@ public class DebugFileTransferServer: NSObject {
                     return new Blob([u8arr], { type: mime });
                 }
                 
-                function sendPayload(type, text, imageDataUrl, historyId) {
+                function sendPayload(type, text, imageDataUrl, historyId, fileName, fileMimeType, fileDataBase64) {
                     setStatus('发送中...');
                     try {
                         logDebug('send payload start, type=' + type + ', historyId=' + (historyId || 'new'));
-                        var payloadForHistory = { id: historyId || '', type: type, text: text, imageDataUrl: imageDataUrl, createdAt: Date.now(), updatedAt: Date.now() };
-                        var url = type === 'text' ? '/api/upload-text' : '/api/upload-image';
-                        var body = type === 'text' ? JSON.stringify({ text: text }) : JSON.stringify({ imageData: imageDataUrl });
+                        var payloadForHistory = { id: historyId || '', type: type, text: text, imageDataUrl: imageDataUrl, fileName: fileName || '', fileMimeType: fileMimeType || '', fileDataBase64: fileDataBase64 || '', createdAt: Date.now(), updatedAt: Date.now() };
+                        var url = '/api/upload-text';
+                        var body = JSON.stringify({ text: text });
+                        if (type === 'image') {
+                            url = '/api/upload-image';
+                            body = JSON.stringify({ imageData: imageDataUrl });
+                        } else if (type === 'file') {
+                            url = '/api/upload-file';
+                            body = JSON.stringify({ fileName: fileName || ('upload_' + Date.now()), mimeType: fileMimeType || 'application/octet-stream', fileData: fileDataBase64 || '' });
+                        }
                         logDebug('POST ' + url + ', bodyLen=' + body.length);
                         postJson(url, body, function(err, json, status) {
                             if (err) {
@@ -1252,6 +1813,8 @@ public class DebugFileTransferServer: NSObject {
                 
                 setUploadType('text');
                 renderHistory();
+                setupDropZone();
+                setupFileDropZone();
                 logDebug('page ready');
             </script>
         </body>
