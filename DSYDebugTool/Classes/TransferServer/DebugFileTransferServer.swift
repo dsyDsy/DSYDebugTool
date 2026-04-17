@@ -9,6 +9,7 @@ import UIKit
 import Foundation
 // MARK: - 文件传输服务器
 import GCDWebServer
+import Photos
 
 public class DebugFileTransferServer: NSObject {
     public static let shared = DebugFileTransferServer()
@@ -26,6 +27,10 @@ public class DebugFileTransferServer: NSObject {
     private var appDisplayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? ""
   
     private var uploadedFiles: [(name: String, data: Data, uploadTime: Date)] = []
+    /// Web 端上传图片到 App 的大小限制（字节），可在 App 侧按需覆盖
+    public var webImageUploadMaxSizeBytes: Int = 100 * 1024 * 1024
+    /// Web 端上传文本到 App 的大小限制（字节）
+    private var webTextUploadMaxSizeBytes: Int = 100 * 1024 * 1024
     
     override init() {
         super.init()
@@ -135,6 +140,32 @@ public class DebugFileTransferServer: NSObject {
         webServer?.addHandler(forMethod: "GET", path: "/", request: GCDWebServerRequest.self) { [weak self] request in
             DebugFileTransferServer.shared.log("📥 收到GET请求（主页）: \(request.path)")
             return self?.handleMainPage() ?? GCDWebServerErrorResponse(statusCode: 500)
+        }
+        
+        // favicon 处理，避免浏览器默认请求返回 501
+        webServer?.addHandler(forMethod: "GET", path: "/favicon.ico", request: GCDWebServerRequest.self) { _ in
+            let response = GCDWebServerDataResponse(data: Data(), contentType: "image/x-icon")
+            response.statusCode = 204
+            response.setValue("no-cache", forAdditionalHeader: "Cache-Control")
+            return response
+        }
+        
+        // Web 端上传到 App（文本）
+        webServer?.addHandler(forMethod: "POST", path: "/api/upload-text", request: GCDWebServerDataRequest.self) { [weak self] request, completion in
+            guard let self = self, let dataRequest = request as? GCDWebServerDataRequest else {
+                completion(GCDWebServerErrorResponse(statusCode: 500))
+                return
+            }
+            completion(self.handleWebTextUpload(request: dataRequest))
+        }
+        
+        // Web 端上传到 App（图片）
+        webServer?.addHandler(forMethod: "POST", path: "/api/upload-image", request: GCDWebServerDataRequest.self) { [weak self] request, completion in
+            guard let self = self, let dataRequest = request as? GCDWebServerDataRequest else {
+                completion(GCDWebServerErrorResponse(statusCode: 500))
+                return
+            }
+            completion(self.handleWebImageUpload(request: dataRequest))
         }
         
         // 启动服务器（端口占用时自动顺延）
@@ -387,6 +418,200 @@ public class DebugFileTransferServer: NSObject {
         return previewableExtensions.contains(fileExtension)
     }
     
+    private func handleWebTextUpload(request: GCDWebServerDataRequest) -> GCDWebServerResponse {
+        log("⬆️ Web文本上传，请求大小: \(request.data.count)")
+        guard let json = try? JSONSerialization.jsonObject(with: request.data) as? [String: Any] else {
+            log("❌ Web文本上传 JSON 解析失败")
+            return jsonResponse(code: 400, message: "JSON格式错误")
+        }
+        
+        let text = (json["text"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            log("❌ Web文本上传为空")
+            return jsonResponse(code: 400, message: "文本不能为空")
+        }
+        
+        if text.utf8.count > webTextUploadMaxSizeBytes {
+            log("❌ Web文本上传过大: \(text.utf8.count)")
+            return jsonResponse(code: 400, message: "文本过大，最大支持20MB")
+        }
+        log("✅ Web文本上传成功，长度: \(text.count)")
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.presentReceivedTextAlert(text: text)
+        }
+        return jsonResponse(message: "文本已发送到App")
+    }
+    
+    private func handleWebImageUpload(request: GCDWebServerDataRequest) -> GCDWebServerResponse {
+        log("⬆️ Web图片上传，请求大小: \(request.data.count)")
+        guard let json = try? JSONSerialization.jsonObject(with: request.data) as? [String: Any] else {
+            log("❌ Web图片上传 JSON 解析失败")
+            return jsonResponse(code: 400, message: "JSON格式错误")
+        }
+        
+        let base64OrDataURL = (json["imageData"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base64OrDataURL.isEmpty else {
+            log("❌ Web图片上传数据为空")
+            return jsonResponse(code: 400, message: "图片数据不能为空")
+        }
+        
+        let base64String: String
+        if let commaIndex = base64OrDataURL.firstIndex(of: ","),
+           base64OrDataURL[..<commaIndex].contains("base64") {
+            base64String = String(base64OrDataURL[base64OrDataURL.index(after: commaIndex)...])
+        } else {
+            base64String = base64OrDataURL
+        }
+        
+        guard let imageData = Data(base64Encoded: base64String), !imageData.isEmpty else {
+            log("❌ Web图片 base64 解码失败")
+            return jsonResponse(code: 400, message: "图片数据解析失败")
+        }
+        
+        if imageData.count > webImageUploadMaxSizeBytes {
+            log("❌ Web图片过大: \(imageData.count)")
+            return jsonResponse(code: 400, message: "图片过大，最大支持20MB")
+        }
+        
+        guard let image = UIImage(data: imageData) else {
+            log("❌ Web图片 UIImage 解析失败")
+            return jsonResponse(code: 400, message: "图片解析失败")
+        }
+        log("✅ Web图片上传成功，大小: \(imageData.count)")
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.presentReceivedImageAlert(image: image)
+        }
+        return jsonResponse(message: "图片已发送到App")
+    }
+    
+    private func jsonResponse(code: Int = 0, message: String) -> GCDWebServerResponse {
+        let payload: [String: Any] = [
+            "code": code,
+            "message": message,
+            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: payload, options: [])) ?? Data()
+        let response = GCDWebServerDataResponse(data: data, contentType: "application/json; charset=utf-8")
+        response.setValue("no-cache", forAdditionalHeader: "Cache-Control")
+        return response
+    }
+    
+    private func topMostViewController() -> UIViewController? {
+        return UIApplication.shared.keyWindow?.rootViewController?.topMostViewController
+    }
+    
+    private func presentReceivedTextAlert(text: String) {
+        guard let topVC = topMostViewController() else { return }
+        if topVC.presentedViewController is UIAlertController { return }
+        
+        let alert = UIAlertController(
+            title: "收到网页文本",
+            message: text,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "复制", style: .default, handler: { _ in
+            UIPasteboard.general.string = text
+        }))
+        alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
+        topVC.present(alert, animated: true)
+    }
+    
+    private func presentReceivedImageAlert(image: UIImage) {
+        guard let topVC = topMostViewController() else { return }
+        if topVC.presentedViewController is UIAlertController { return }
+        
+        let previewVC = UIViewController()
+        previewVC.view.backgroundColor = .systemBackground
+        
+        let imageView = UIImageView(image: image)
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        previewVC.view.addSubview(imageView)
+        
+        // 根据图片比例计算预览区域，避免超高图导致大量空白
+        let maxWidth = min(UIScreen.main.bounds.width - 90, 300)
+        let maxHeight: CGFloat = 320
+        let imageSize = image.size
+        let safeImageSize = CGSize(width: max(imageSize.width, 1), height: max(imageSize.height, 1))
+        let scale = min(maxWidth / safeImageSize.width, maxHeight / safeImageSize.height)
+        let previewWidth = max(120, safeImageSize.width * scale)
+        let previewHeight = max(120, safeImageSize.height * scale)
+        previewVC.preferredContentSize = CGSize(width: previewWidth + 24, height: previewHeight + 24)
+        
+        NSLayoutConstraint.activate([
+            imageView.widthAnchor.constraint(equalToConstant: previewWidth),
+            imageView.heightAnchor.constraint(equalToConstant: previewHeight),
+            imageView.centerXAnchor.constraint(equalTo: previewVC.view.centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: previewVC.view.centerYAnchor)
+        ])
+        
+        let alert = UIAlertController(
+            title: "收到网页图片",
+            message: "可直接保存到系统相册",
+            preferredStyle: .alert
+        )
+        alert.setValue(previewVC, forKey: "contentViewController")
+        alert.addAction(UIAlertAction(title: "添加到相册", style: .default, handler: { [weak self] _ in
+            self?.saveImageToAlbum(image: image)
+        }))
+        alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
+        topVC.present(alert, animated: true)
+    }
+    
+    private func saveImageToAlbum(image: UIImage) {
+        let saveBlock = {
+            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+            self.presentSimpleTip(title: "保存成功", message: "图片已添加到系统相册")
+        }
+        
+        if #available(iOS 14, *) {
+            let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+            switch status {
+            case .authorized, .limited:
+                saveBlock()
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization(for: .addOnly) { auth in
+                    DispatchQueue.main.async {
+                        if auth == .authorized || auth == .limited {
+                            saveBlock()
+                        } else {
+                            self.presentSimpleTip(title: "无权限", message: "请在系统设置中允许照片权限")
+                        }
+                    }
+                }
+            default:
+                presentSimpleTip(title: "无权限", message: "请在系统设置中允许照片权限")
+            }
+        } else {
+            let status = PHPhotoLibrary.authorizationStatus()
+            switch status {
+            case .authorized:
+                saveBlock()
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization { auth in
+                    DispatchQueue.main.async {
+                        if auth == .authorized {
+                            saveBlock()
+                        } else {
+                            self.presentSimpleTip(title: "无权限", message: "请在系统设置中允许照片权限")
+                        }
+                    }
+                }
+            default:
+                presentSimpleTip(title: "无权限", message: "请在系统设置中允许照片权限")
+            }
+        }
+    }
+    
+    private func presentSimpleTip(title: String, message: String) {
+        guard let topVC = topMostViewController() else { return }
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        topVC.present(alert, animated: true)
+    }
+    
     private func formatFileSize(_ bytes: Int) -> String {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useKB, .useMB, .useGB]
@@ -442,6 +667,11 @@ public class DebugFileTransferServer: NSObject {
                 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
                 .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
                 h1 { color: #333; text-align: center; margin-bottom: 30px; font-size: 28px; }
+                .top-nav { display:flex; gap:12px; margin-bottom: 12px; }
+                .tab-btn { border: 0; padding:10px 16px; border-radius:999px; font-weight:600; background:#edf2ff; color:#333; cursor:pointer; }
+                .tab-btn.active { background:#007AFF; color:#fff; }
+                .panel { display:none; }
+                .panel.active { display:block; }
                 .info { background: linear-gradient(45deg, #e3f2fd, #f3e5f5); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007AFF; }
                 .file-list { margin-top: 30px; }
                 .file-item { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e9ecef; }
@@ -477,11 +707,31 @@ public class DebugFileTransferServer: NSObject {
                 .stat-item { text-align: center; }
                 .stat-number { font-size: 24px; font-weight: bold; color: #007AFF; }
                 .stat-label { font-size: 14px; color: #666; margin-top: 5px; }
+                .upload-card { border:1px solid #e9ecef; border-radius: 10px; padding:16px; margin-top:16px; background:#f8f9fa; }
+                .upload-row { display:flex; gap:12px; align-items:center; margin-top:12px; flex-wrap: wrap; }
+                .upload-text { width:100%; min-height:120px; border:1px solid #d0d7de; border-radius:8px; padding:10px; font-size:14px; box-sizing:border-box; }
+                .upload-btn { border:none; border-radius:20px; padding:9px 16px; color:#fff; font-weight:600; cursor:pointer; background:linear-gradient(45deg,#007AFF,#0056CC); }
+                .upload-btn.secondary { background:linear-gradient(45deg,#6c757d,#495057); }
+                .upload-btn.warn { background:linear-gradient(45deg,#ff8f00,#ff6f00); }
+                .history-item { border:1px solid #e9ecef; border-radius:10px; padding:12px; background:#fff; margin-top:10px; }
+                .history-meta { font-size:12px; color:#666; margin-bottom:8px; }
+                .history-preview { font-size:14px; color:#222; max-height:60px; overflow:hidden; white-space:pre-wrap; word-break: break-word; }
+                .history-image { max-width:140px; max-height:90px; border-radius:6px; display:block; margin-top:8px; border:1px solid #eee; }
+                .tiny-tip { font-size:12px; color:#666; margin-top:8px; }
+                .status-tip { font-size:13px; margin-top:10px; color:#007AFF; }
+                .debug-log-card { border:1px dashed #cfd8dc; border-radius:10px; padding:12px; margin-top:14px; background:#fafcff; }
+                .debug-log-header { display:flex; justify-content:space-between; align-items:center; }
+                .debug-log-box { margin-top:8px; height:160px; overflow:auto; background:#111; color:#d6f5d6; font-family: Menlo, Monaco, monospace; font-size:12px; padding:8px; border-radius:8px; white-space: pre-wrap; word-break: break-word; }
             </style>
         </head>
         <body>
             <div class="container">
                 <h1>📱 \(appDisplayName) 文件接收站</h1>
+                <div class="top-nav">
+                    <button id="tabReceive" type="button" class="tab-btn active" onclick="switchTab('receive')">📥 接收站</button>
+                    <button id="tabUpload" type="button" class="tab-btn" onclick="switchTab('upload')">⬆️ 上传到App</button>
+                </div>
+                <div id="panelReceive" class="panel active">
                 
                 <div class="info">
                     <strong>📋 使用说明：</strong><br>
@@ -523,6 +773,56 @@ public class DebugFileTransferServer: NSObject {
                     • 文件按上传时间倒序排列（最新的在最上面）<br>
                     • 支持预览图片、视频、文本、PDF等文件
                 </div>
+                </div>
+                
+                <div id="panelUpload" class="panel">
+                    <div class="info">
+                        <strong>📤 上传到App</strong><br>
+                        • 支持发送文本或图片到手机 App<br>
+                        • App 收到后会立刻弹框：文本可复制，图片可添加到相册<br>
+                        • 支持历史记录、编辑、预览、再次发送
+                    </div>
+                    
+                    <div class="upload-card">
+                        <div><strong>内容类型</strong></div>
+                        <div class="upload-row">
+                            <button type="button" class="upload-btn secondary" id="typeTextBtn" onclick="setUploadType('text')">📝 文本</button>
+                            <button type="button" class="upload-btn secondary" id="typeImageBtn" onclick="setUploadType('image')">🖼️ 图片</button>
+                        </div>
+                        
+                        <div id="textEditorWrap" style="margin-top:12px;">
+                            <textarea id="textInput" class="upload-text" placeholder="输入要发送到App的文字"></textarea>
+                        </div>
+                        
+                        <div id="imageEditorWrap" style="display:none; margin-top:12px;">
+                            <input id="imageInput" type="file" accept="image/*" onchange="onSelectImage(event)" />
+                            <img id="imagePreview" class="history-image" style="display:none; max-width: 260px; max-height: 180px;" />
+                        </div>
+                        
+                        <div class="upload-row">
+                            <button type="button" class="upload-btn" onclick="sendCurrent()">发送到App</button>
+                            <button type="button" class="upload-btn warn" onclick="clearEditor()">清空</button>
+                        </div>
+                        <div id="sendStatus" class="status-tip"></div>
+                        <div class="tiny-tip">历史保存在当前浏览器 LocalStorage。</div>
+                        
+                        <div class="debug-log-card">
+                            <div class="debug-log-header">
+                                <strong>调试日志</strong>
+                                <button type="button" class="upload-btn secondary" onclick="clearDebugLog()">清空日志</button>
+                            </div>
+                            <div id="debugLogBox" class="debug-log-box"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="upload-card">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <strong>历史记录</strong>
+                            <button type="button" class="upload-btn secondary" onclick="clearHistory()">清空历史</button>
+                        </div>
+                        <div id="historyList"></div>
+                    </div>
+                </div>
             </div>
             
             <!-- 预览模态框 -->
@@ -539,14 +839,43 @@ public class DebugFileTransferServer: NSObject {
             </div>
             
             <script>
+                let uploadType = 'text';
+                let selectedImageDataUrl = '';
+                let editingHistoryId = '';
+                const HISTORY_KEY = 'dsy_debug_upload_history_v1';
+                
+                function logDebug(msg) {
+                    const box = document.getElementById('debugLogBox');
+                    if (!box) return;
+                    const ts = new Date().toLocaleTimeString();
+                    box.textContent += '[' + ts + '] ' + msg + '\\n';
+                    box.scrollTop = box.scrollHeight;
+                }
+                
+                function clearDebugLog() {
+                    const box = document.getElementById('debugLogBox');
+                    if (box) box.textContent = '';
+                }
+                
+                window.addEventListener('error', function(e) {
+                    logDebug('JS Error: ' + (e.message || 'unknown') + ' @' + (e.filename || '') + ':' + (e.lineno || 0));
+                });
+                
+                window.addEventListener('unhandledrejection', function(e) {
+                    const reason = e.reason && e.reason.message ? e.reason.message : String(e.reason || 'unknown');
+                    logDebug('Promise Rejection: ' + reason);
+                });
+                
                 // 每30秒自动刷新页面
-                setTimeout(() => {
-                    location.reload();
+                setTimeout(function() {
+                    if (document.getElementById('panelReceive').classList.contains('active')) {
+                        location.reload();
+                    }
                 }, 30000);
                 
                 // 添加下载统计
-                document.querySelectorAll('.download-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
+                document.querySelectorAll('.download-btn').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
                         console.log('文件下载:', btn.getAttribute('download'));
                     });
                 });
@@ -633,11 +962,297 @@ public class DebugFileTransferServer: NSObject {
                     return div.innerHTML;
                 }
                 
+                function escapeAttr(text) {
+                    return String(text || '')
+                        .replace(/&/g, '&amp;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+                }
+                
                 // 预览错误处理
                 function handlePreviewError() {
                     const body = document.getElementById('previewBody');
                     body.innerHTML = '<div class="preview-unsupported"><div class="emoji">❌</div><h3>预览失败</h3><p>无法加载文件，请尝试下载后查看</p></div>';
                 }
+                
+                function switchTab(tab) {
+                    logDebug('click tab: ' + tab);
+                    const isReceive = tab === 'receive';
+                    const panelReceive = document.getElementById('panelReceive');
+                    const panelUpload = document.getElementById('panelUpload');
+                    const tabReceive = document.getElementById('tabReceive');
+                    const tabUpload = document.getElementById('tabUpload');
+                    if (isReceive) {
+                        panelReceive.classList.add('active');
+                        panelUpload.classList.remove('active');
+                        tabReceive.classList.add('active');
+                        tabUpload.classList.remove('active');
+                    } else {
+                        panelUpload.classList.add('active');
+                        panelReceive.classList.remove('active');
+                        tabUpload.classList.add('active');
+                        tabReceive.classList.remove('active');
+                    }
+                }
+                
+                function setUploadType(type) {
+                    logDebug('set upload type: ' + type);
+                    uploadType = type;
+                    const isText = type === 'text';
+                    document.getElementById('textEditorWrap').style.display = isText ? 'block' : 'none';
+                    document.getElementById('imageEditorWrap').style.display = isText ? 'none' : 'block';
+                    document.getElementById('typeTextBtn').style.opacity = isText ? '1' : '0.7';
+                    document.getElementById('typeImageBtn').style.opacity = isText ? '0.7' : '1';
+                }
+                
+                function onSelectImage(event) {
+                    const file = event.target.files && event.target.files[0];
+                    if (!file) return;
+                    logDebug('select image: ' + file.name + ', size=' + file.size);
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        selectedImageDataUrl = e.target.result || '';
+                        const preview = document.getElementById('imagePreview');
+                        preview.src = selectedImageDataUrl;
+                        preview.style.display = selectedImageDataUrl ? 'block' : 'none';
+                    };
+                    reader.readAsDataURL(file);
+                }
+                
+                function findInList(list, predicate) {
+                    if (!list || !list.length) return null;
+                    for (var i = 0; i < list.length; i++) {
+                        if (predicate(list[i])) return list[i];
+                    }
+                    return null;
+                }
+                
+                function findIndexInList(list, predicate) {
+                    if (!list || !list.length) return -1;
+                    for (var i = 0; i < list.length; i++) {
+                        if (predicate(list[i])) return i;
+                    }
+                    return -1;
+                }
+                
+                function getHistory() {
+                    try {
+                        var raw = localStorage.getItem(HISTORY_KEY);
+                        var parsed = raw ? JSON.parse(raw) : [];
+                        return Array.isArray(parsed) ? parsed : [];
+                    } catch (e) {
+                        return [];
+                    }
+                }
+                
+                function setHistory(list) {
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+                }
+                
+                function saveHistory(item) {
+                    var list = getHistory();
+                    if (item.id) {
+                        var idx = findIndexInList(list, function(x) { return x.id === item.id; });
+                        if (idx >= 0) {
+                            list[idx] = item;
+                        } else {
+                            list.unshift(item);
+                        }
+                    } else {
+                        item.id = 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+                        list.unshift(item);
+                    }
+                    setHistory(list);
+                    renderHistory();
+                }
+                
+                function clearHistory() {
+                    logDebug('clear history');
+                    setHistory([]);
+                    renderHistory();
+                }
+                
+                function renderHistory() {
+                    var host = document.getElementById('historyList');
+                    var list = getHistory();
+                    if (!list.length) {
+                        host.innerHTML = '<div class="tiny-tip">暂无历史记录</div>';
+                        return;
+                    }
+                    host.innerHTML = list.map(function(item) {
+                        var title = item.type === 'text' ? '📝 文本' : '🖼️ 图片';
+                        var preview = item.type === 'text'
+                            ? '<div class="history-preview">' + escapeHtml(item.text || '') + '</div>'
+                            : ((item.imageDataUrl || '') ? '<img class="history-image" src="' + item.imageDataUrl + '" />' : '<div class="tiny-tip">图片已失效</div>');
+                        var time = new Date(item.updatedAt || item.createdAt || Date.now()).toLocaleString();
+                        return '<div class="history-item">' +
+                            '<div class="history-meta">' + title + ' • ' + time + '</div>' +
+                            preview +
+                            '<div class="upload-row">' +
+                            '<button class="upload-btn secondary" data-act="edit" data-id="' + escapeAttr(item.id) + '">修改</button>' +
+                            '<button class="upload-btn" data-act="resend" data-id="' + escapeAttr(item.id) + '">再次发送</button>' +
+                            '<button class="upload-btn warn" data-act="preview" data-id="' + escapeAttr(item.id) + '">预览</button>' +
+                            '</div></div>';
+                    }).join('');
+                }
+                
+                document.addEventListener('click', function(e) {
+                    var target = e.target;
+                    if (!target) return;
+                    var action = target.getAttribute('data-act');
+                    var id = target.getAttribute('data-id');
+                    if (!action || !id) return;
+                    if (action === 'edit') {
+                        editHistory(id);
+                    } else if (action === 'resend') {
+                        resendHistory(id);
+                    } else if (action === 'preview') {
+                        previewHistory(id);
+                    }
+                });
+                
+                function editHistory(id) {
+                    logDebug('edit history: ' + id);
+                    var item = findInList(getHistory(), function(x) { return x.id === id; });
+                    if (!item) return;
+                    editingHistoryId = id;
+                    setUploadType(item.type || 'text');
+                    if ((item.type || 'text') === 'text') {
+                        document.getElementById('textInput').value = item.text || '';
+                    } else {
+                        selectedImageDataUrl = item.imageDataUrl || '';
+                        const preview = document.getElementById('imagePreview');
+                        preview.src = selectedImageDataUrl;
+                        preview.style.display = selectedImageDataUrl ? 'block' : 'none';
+                    }
+                    setStatus('已载入历史记录，可直接修改后发送');
+                }
+                
+                function previewHistory(id) {
+                    logDebug('preview history: ' + id);
+                    var item = findInList(getHistory(), function(x) { return x.id === id; });
+                    if (!item) return;
+                    if ((item.type || 'text') === 'text') {
+                        alert(item.text || '(空文本)');
+                    } else if (item.imageDataUrl) {
+                        window.open(item.imageDataUrl, '_blank');
+                    }
+                }
+                
+                function resendHistory(id) {
+                    logDebug('resend history: ' + id);
+                    var item = findInList(getHistory(), function(x) { return x.id === id; });
+                    if (!item) return;
+                    sendPayload(item.type || 'text', item.text || '', item.imageDataUrl || '', id);
+                }
+                
+                function clearEditor() {
+                    logDebug('clear editor');
+                    editingHistoryId = '';
+                    document.getElementById('textInput').value = '';
+                    document.getElementById('imageInput').value = '';
+                    selectedImageDataUrl = '';
+                    var preview = document.getElementById('imagePreview');
+                    preview.src = '';
+                    preview.style.display = 'none';
+                    setStatus('已清空输入内容');
+                }
+                
+                function setStatus(text) {
+                    logDebug('status: ' + (text || ''));
+                    document.getElementById('sendStatus').textContent = text || '';
+                }
+                
+                function sendCurrent() {
+                    logDebug('click sendCurrent, type=' + uploadType);
+                    if (uploadType === 'text') {
+                        var text = (document.getElementById('textInput').value || '').trim();
+                        if (!text) {
+                            setStatus('请输入文本后再发送');
+                            return;
+                        }
+                        sendPayload('text', text, '', editingHistoryId);
+                    } else {
+                        if (!selectedImageDataUrl) {
+                            setStatus('请先选择图片');
+                            return;
+                        }
+                        sendPayload('image', '', selectedImageDataUrl, editingHistoryId);
+                    }
+                }
+                
+                function dataUrlToBlob(dataUrl) {
+                    var parts = dataUrl.split(',');
+                    var mime = parts[0].match(/:(.*?);/)[1];
+                    var binary = atob(parts[1]);
+                    var len = binary.length;
+                    var u8arr = new Uint8Array(len);
+                    for (var i = 0; i < len; i++) {
+                        u8arr[i] = binary.charCodeAt(i);
+                    }
+                    return new Blob([u8arr], { type: mime });
+                }
+                
+                function sendPayload(type, text, imageDataUrl, historyId) {
+                    setStatus('发送中...');
+                    try {
+                        logDebug('send payload start, type=' + type + ', historyId=' + (historyId || 'new'));
+                        var payloadForHistory = { id: historyId || '', type: type, text: text, imageDataUrl: imageDataUrl, createdAt: Date.now(), updatedAt: Date.now() };
+                        var url = type === 'text' ? '/api/upload-text' : '/api/upload-image';
+                        var body = type === 'text' ? JSON.stringify({ text: text }) : JSON.stringify({ imageData: imageDataUrl });
+                        logDebug('POST ' + url + ', bodyLen=' + body.length);
+                        postJson(url, body, function(err, json, status) {
+                            if (err) {
+                                logDebug('send payload error=' + err);
+                                setStatus('发送失败：' + err);
+                                return;
+                            }
+                            logDebug('response status=' + status);
+                            logDebug('response json=' + JSON.stringify(json));
+                            if (status < 200 || status >= 300 || !json || json.code !== 0) {
+                                setStatus('发送失败：' + ((json && json.message) || '未知错误'));
+                                return;
+                            }
+                            saveHistory(payloadForHistory);
+                            editingHistoryId = '';
+                            setStatus('发送成功：' + (json.message || '已到达 App'));
+                        });
+                    } catch (err) {
+                        logDebug('send payload error=' + ((err && err.message) || String(err)));
+                        setStatus('发送失败：' + ((err && err.message) || '未知错误'));
+                    }
+                }
+                
+                function postJson(url, body, callback) {
+                    try {
+                        var xhr = new XMLHttpRequest();
+                        xhr.open('POST', url, true);
+                        xhr.setRequestHeader('Content-Type', 'application/json');
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState !== 4) return;
+                            var status = xhr.status || 0;
+                            var json = null;
+                            try {
+                                json = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+                            } catch (e) {
+                                callback('响应不是有效JSON: ' + (xhr.responseText || ''), null, status);
+                                return;
+                            }
+                            callback(null, json, status);
+                        };
+                        xhr.onerror = function() {
+                            callback('网络请求失败', null, xhr.status || 0);
+                        };
+                        xhr.send(body);
+                    } catch (e) {
+                        callback((e && e.message) || '请求异常', null, 0);
+                    }
+                }
+                
+                setUploadType('text');
+                renderHistory();
+                logDebug('page ready');
             </script>
         </body>
         </html>
