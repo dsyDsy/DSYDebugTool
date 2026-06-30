@@ -328,7 +328,9 @@
         type = _FileTypePList;
     } else if ([extension compare:@"xml" options:NSCaseInsensitiveSearch] == NSOrderedSame) {
         type = _FileTypeXML;
-    } else if ([extension compare:@"db" options:NSCaseInsensitiveSearch] == NSOrderedSame) {
+    } else if ([extension compare:@"db" options:NSCaseInsensitiveSearch] == NSOrderedSame ||
+               [extension compare:@"sqlite" options:NSCaseInsensitiveSearch] == NSOrderedSame ||
+               [extension compare:@"sqlite3" options:NSCaseInsensitiveSearch] == NSOrderedSame) {
         type = _FileTypeDatabase;
     } else if ([extension compare:@"js" options:NSCaseInsensitiveSearch] == NSOrderedSame) {
         type = _FileTypeJS;

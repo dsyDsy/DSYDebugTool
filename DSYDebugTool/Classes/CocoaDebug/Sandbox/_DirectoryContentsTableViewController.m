@@ -274,6 +274,15 @@
 //        directoryContentsTableViewController.hidesBottomBarWhenPushed = YES;//liman
         return directoryContentsTableViewController;
     } else {
+        if (fileInfo.type == _FileTypeDatabase) {
+            Class controllerClass = NSClassFromString(@"SandboxSQLiteDatabaseViewController");
+            if (controllerClass) {
+                UIViewController *databaseViewController = [[controllerClass alloc] initWithFileURL:fileInfo.URL];
+                databaseViewController.hidesBottomBarWhenPushed = YES;
+                return databaseViewController;
+            }
+        }
+
         if ([_Sandboxer shared].isShareable && fileInfo.isCanPreviewInQuickLook) {
             //NSLog(@"Quick Look can preview this file");
             self.previewingFileInfo = fileInfo;
@@ -763,4 +772,3 @@
 }
 
 @end
-
