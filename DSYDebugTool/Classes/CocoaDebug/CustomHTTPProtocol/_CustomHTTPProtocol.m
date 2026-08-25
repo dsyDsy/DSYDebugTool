@@ -52,7 +52,7 @@
     _sessionCompletionHandler(NSURLSessionAuthChallengeUseCredential, nil);
 }
 
-- (void)cancelAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+- (void)cancelAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge
 {
     _sessionCompletionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, nil);
 }
@@ -806,7 +806,6 @@ static NSString * kOurRecursiveRequestFlagProperty = @"com.apple.dts.CustomHTTPP
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveResponse:(NSURLResponse *)response completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler
 {
     NSURLCacheStoragePolicy cacheStoragePolicy;
-    NSInteger               statusCode;
     
     #pragma unused(session)
     #pragma unused(dataTask)
@@ -821,11 +820,9 @@ static NSString * kOurRecursiveRequestFlagProperty = @"com.apple.dts.CustomHTTPP
 
     if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
         cacheStoragePolicy = CacheStoragePolicyForRequestAndResponse(self.task.originalRequest, (NSHTTPURLResponse *) response);
-        statusCode = [((NSHTTPURLResponse *) response) statusCode];
     } else {
         //assert(NO);
         cacheStoragePolicy = NSURLCacheStorageNotAllowed;
-        statusCode = 42;
     }
 
     

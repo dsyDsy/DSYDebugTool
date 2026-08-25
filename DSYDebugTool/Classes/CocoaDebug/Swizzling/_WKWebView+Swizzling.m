@@ -11,7 +11,72 @@
 #import "_ObjcLog.h"
 #import "_NetworkHelper.h"
 
+static NSString * const kCocoaDebugWKWebViewMonitoringKey = @"enableWKWebViewMonitoring_CocoaDebug";
+
+static BOOL CocoaDebugWKWebViewMonitoringEnabled(void) {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:kCocoaDebugWKWebViewMonitoringKey];
+}
+
+static BOOL CocoaDebugSwizzleInstanceMethod(Class cls, SEL originalSelector, SEL replacedSelector) {
+    Method originalMethod = class_getInstanceMethod(cls, originalSelector);
+    Method replacedMethod = class_getInstanceMethod(cls, replacedSelector);
+    if (originalMethod == NULL || replacedMethod == NULL) {
+        return NO;
+    }
+
+    if (class_addMethod(cls,
+                        originalSelector,
+                        method_getImplementation(replacedMethod),
+                        method_getTypeEncoding(replacedMethod))) {
+        // 原方法可能来自父类，必须把父类实现保存到 replaced selector。
+        class_replaceMethod(cls,
+                            replacedSelector,
+                            method_getImplementation(originalMethod),
+                            method_getTypeEncoding(originalMethod));
+    } else {
+        method_exchangeImplementations(originalMethod, replacedMethod);
+    }
+    return YES;
+}
+
 @interface WKWebView () <WKScriptMessageHandler>
+@end
+
+@interface WKWebView (CocoaDebugSwizzlingPrivate)
+- (void)installMessageHandlerNamed:(NSString *)name
+                     configuration:(WKWebViewConfiguration *)configuration;
+@end
+
+/// WKUserContentController 会强持有 script message handler。
+/// 不能直接把 WKWebView 自身作为 handler，否则会形成：
+/// WKWebView -> configuration -> userContentController -> WKWebView。
+@interface CocoaDebugWeakScriptMessageHandler : NSObject <WKScriptMessageHandler>
+@property (nonatomic, weak) id<WKScriptMessageHandler> target;
+- (instancetype)initWithTarget:(id<WKScriptMessageHandler>)target;
+@end
+
+@implementation CocoaDebugWeakScriptMessageHandler
+
+- (instancetype)initWithTarget:(id<WKScriptMessageHandler>)target {
+    self = [super init];
+    if (self) {
+        _target = target;
+    }
+    return self;
+}
+
+- (void)userContentController:(WKUserContentController *)userContentController
+      didReceiveScriptMessage:(WKScriptMessage *)message {
+    // WebView 销毁后 target 会自动变为 nil，避免回调反向延长其生命周期。
+    if (!CocoaDebugWKWebViewMonitoringEnabled()) {
+        return;
+    }
+    id<WKScriptMessageHandler> target = self.target;
+    if (target == nil) {
+        return;
+    }
+    [target userContentController:userContentController didReceiveScriptMessage:message];
+}
 
 @end
 
@@ -19,57 +84,36 @@
 
 #pragma mark - life
 + (void)load {
-    
-    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"enableWKWebViewMonitoring_CocoaDebug"]) {
-        
-        static dispatch_once_t onceToken;
-        dispatch_once(&onceToken, ^{
-            
-            SEL original_sel = @selector(initWithFrame:configuration:);
-            SEL replaced_sel = @selector(replaced_initWithFrame:configuration:);
-            Method original_method = class_getInstanceMethod([self class], original_sel);
-            Method replaced_method = class_getInstanceMethod([self class], replaced_sel);
-            if (!class_addMethod([self class], original_sel, method_getImplementation(replaced_method), method_getTypeEncoding(replaced_method))) {
-                method_exchangeImplementations(original_method, replaced_method);
-            }
-            
-            /*********************************************************************************************************************************/
-            
-            SEL original_sel2 = NSSelectorFromString(@"dealloc");
-            SEL replaced_sel2 = @selector(replaced_dealloc);
-            Method original_method2 = class_getInstanceMethod([self class], original_sel2);
-            Method replaced_method2 = class_getInstanceMethod([self class], replaced_sel2);
-            if (!class_addMethod([self class], original_sel2, method_getImplementation(replaced_method2), method_getTypeEncoding(replaced_method2))) {
-                method_exchangeImplementations(original_method2, replaced_method2);
-            }
-            
-            SEL original_sel3 = NSSelectorFromString(@"willDealloc");
-            SEL replaced_sel3 = @selector(replaced_willDealloc);
-            Method replaced_method3 = class_getInstanceMethod([self class], replaced_sel3);
-            class_addMethod([self class], original_sel3, method_getImplementation(replaced_method3), method_getTypeEncoding(replaced_method3));
-        });
-    }
+    // 保留在 +load 中完成一次性安装，但实际是否采集由运行时配置决定。
+    // 这样首次启动时配置为 false、之后再打开开关时也不会错过 swizzle。
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        CocoaDebugSwizzleInstanceMethod(self,
+                                        @selector(initWithFrame:configuration:),
+                                        @selector(replaced_initWithFrame:configuration:));
+        CocoaDebugSwizzleInstanceMethod(self,
+                                        NSSelectorFromString(@"dealloc"),
+                                        @selector(replaced_dealloc));
+    });
 }
 
 #pragma mark - replaced method
 
-- (BOOL)replaced_willDealloc {
-    // removeScriptMessageHandlerForName
-    [self.configuration.userContentController removeScriptMessageHandlerForName:@"log"];
-    [self.configuration.userContentController removeScriptMessageHandlerForName:@"error"];
-    [self.configuration.userContentController removeScriptMessageHandlerForName:@"warn"];
-    [self.configuration.userContentController removeScriptMessageHandlerForName:@"debug"];
-    [self.configuration.userContentController removeScriptMessageHandlerForName:@"info"];
-    
-    return true;
-}
-
 - (void)replaced_dealloc {
     //WKWebView
-    [_ObjcLog logWithFile:"[WKWebView]" function:"" line:0 color:[UIColor redColor] message:@"-------------------------------- dealloc --------------------------------"];
+    if (CocoaDebugWKWebViewMonitoringEnabled()) {
+        [_ObjcLog logWithFile:"[WKWebView]" function:"" line:0 color:[UIColor redColor] message:@"-------------------------------- dealloc --------------------------------"];
+    }
+    // method_exchangeImplementations 后，replaced_dealloc 指向原始 dealloc。
+    // 必须继续转发，否则会导致 WebView 永远无法完成真正释放。
+    [self replaced_dealloc];
 }
 
 - (instancetype)replaced_initWithFrame:(CGRect)frame configuration:(WKWebViewConfiguration *)configuration {
+    if (!CocoaDebugWKWebViewMonitoringEnabled()) {
+        return [self replaced_initWithFrame:frame configuration:configuration];
+    }
+
     //WKWebView
     [_ObjcLog logWithFile:"[WKWebView]" function:"" line:0 color:[_NetworkHelper shared].mainColor message:@"----------------------------------- init -----------------------------------"];
     
@@ -84,8 +128,7 @@
 
 #pragma mark - private
 - (void)log:(WKWebViewConfiguration *)configuration {
-    [configuration.userContentController removeScriptMessageHandlerForName:@"log"];
-    [configuration.userContentController addScriptMessageHandler:self name:@"log"];
+    [self installMessageHandlerNamed:@"log" configuration:configuration];
     //rewrite the method of console.log
     NSString *jsCode = @"console.log = (function(oriLogFunc){\
     return function(str)\
@@ -99,8 +142,7 @@
 }
 
 - (void)error:(WKWebViewConfiguration *)configuration {
-    [configuration.userContentController removeScriptMessageHandlerForName:@"error"];
-    [configuration.userContentController addScriptMessageHandler:self name:@"error"];
+    [self installMessageHandlerNamed:@"error" configuration:configuration];
     //rewrite the method of console.error
     NSString *jsCode = @"console.error = (function(oriLogFunc){\
     return function(str)\
@@ -114,8 +156,7 @@
 }
 
 - (void)warn:(WKWebViewConfiguration *)configuration {
-    [configuration.userContentController removeScriptMessageHandlerForName:@"warn"];
-    [configuration.userContentController addScriptMessageHandler:self name:@"warn"];
+    [self installMessageHandlerNamed:@"warn" configuration:configuration];
     //rewrite the method of console.warn
     NSString *jsCode = @"console.warn = (function(oriLogFunc){\
     return function(str)\
@@ -129,8 +170,7 @@
 }
 
 - (void)debug:(WKWebViewConfiguration *)configuration {
-    [configuration.userContentController removeScriptMessageHandlerForName:@"debug"];
-    [configuration.userContentController addScriptMessageHandler:self name:@"debug"];
+    [self installMessageHandlerNamed:@"debug" configuration:configuration];
     //rewrite the method of console.debug
     NSString *jsCode = @"console.debug = (function(oriLogFunc){\
     return function(str)\
@@ -144,8 +184,7 @@
 }
 
 - (void)info:(WKWebViewConfiguration *)configuration {
-    [configuration.userContentController removeScriptMessageHandlerForName:@"info"];
-    [configuration.userContentController addScriptMessageHandler:self name:@"info"];
+    [self installMessageHandlerNamed:@"info" configuration:configuration];
     //rewrite the method of console.info
     NSString *jsCode = @"console.info = (function(oriLogFunc){\
     return function(str)\
@@ -156,6 +195,15 @@
     })(console.info);";
     //injected the method when H5 starts to create the DOM tree
     [configuration.userContentController addUserScript:[[WKUserScript alloc] initWithSource:jsCode injectionTime:WKUserScriptInjectionTimeAtDocumentStart forMainFrameOnly:YES]];
+}
+
+- (void)installMessageHandlerNamed:(NSString *)name
+                     configuration:(WKWebViewConfiguration *)configuration {
+    WKUserContentController *userContentController = configuration.userContentController;
+    [userContentController removeScriptMessageHandlerForName:name];
+    CocoaDebugWeakScriptMessageHandler *handler =
+        [[CocoaDebugWeakScriptMessageHandler alloc] initWithTarget:self];
+    [userContentController addScriptMessageHandler:handler name:name];
 }
 
 
