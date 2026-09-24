@@ -423,7 +423,7 @@ class LogViewController: UIViewController {
         super.viewDidLayoutSubviews()
         let tabBarHeight = tabBarController?.tabBar.frame.height ?? 0
         let safeBottom = view.safeAreaInsets.bottom
-        let bottomInset = max(safeBottom, tabBarHeight) + 12
+        let extraBottom = max(0, tabBarHeight - safeBottom)
         
         for (sb, tv) in [(defaultSearchBar, defaultTableView), (rnSearchBar, rnTableView), (webSearchBar, webTableView)] {
             guard let tv = tv else { continue }
@@ -431,9 +431,9 @@ class LogViewController: UIViewController {
                 sb.frame.size.width = view.bounds.width
                 tv.tableHeaderView = sb
             }
-            if tv.contentInset.bottom != bottomInset {
-                tv.contentInset.bottom = bottomInset
-                tv.scrollIndicatorInsets.bottom = bottomInset
+            if tv.contentInset.bottom != extraBottom {
+                tv.contentInset.bottom = extraBottom
+                tv.scrollIndicatorInsets.bottom = extraBottom
             }
         }
     }

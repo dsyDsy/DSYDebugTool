@@ -39,6 +39,12 @@ class CrashDetailViewController: UITableViewController {
         tableView.estimatedRowHeight = 50
         tableView.delegate = self
         
+        extendedLayoutIncludesOpaqueBars = true
+        edgesForExtendedLayout = .all
+        if #available(iOS 11.0, *) {
+            tableView.contentInsetAdjustmentBehavior = .always
+        }
+        
         textviewName.text = "\(crash?.name ?? "N/A")"
         textviewReason.text = "\(crash?.reason ?? "N/A")"
         

@@ -173,11 +173,11 @@ class NetworkViewController: UIViewController {
         
         let tabBarHeight = tabBarController?.tabBar.frame.height ?? 0
         let safeBottom = view.safeAreaInsets.bottom
-        // 动态计算底部留白：确保滑动到最后一行时完全在 TabBar 上方呈现，且多留 12pt 呼吸间距，不被遮挡
-        let bottomInset = max(safeBottom, tabBarHeight) + 12
-        if tableView.contentInset.bottom != bottomInset {
-            tableView.contentInset.bottom = bottomInset
-            tableView.scrollIndicatorInsets.bottom = bottomInset
+        // 仅当系统的 safeAreaInsets.bottom 未能覆盖 TabBar 时做差额补偿，避免重复叠加导致底部多余巨大空白
+        let extraBottom = max(0, tabBarHeight - safeBottom)
+        if tableView.contentInset.bottom != extraBottom {
+            tableView.contentInset.bottom = extraBottom
+            tableView.scrollIndicatorInsets.bottom = extraBottom
         }
     }
     

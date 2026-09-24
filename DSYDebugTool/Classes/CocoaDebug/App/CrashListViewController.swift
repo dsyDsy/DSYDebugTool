@@ -34,6 +34,12 @@ class CrashListViewController: UITableViewController {
         tableView.dataSource = self
         tableView.tableFooterView = UIView()
         
+        extendedLayoutIncludesOpaqueBars = true
+        edgesForExtendedLayout = .all
+        if #available(iOS 11.0, *) {
+            tableView.contentInsetAdjustmentBehavior = .always
+        }
+        
         models = CrashStoreManager.shared.crashArray
         tableView.reloadData()
     }

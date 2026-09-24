@@ -10,13 +10,12 @@
         <!--Logs-->
         <scene sceneID="afz-qj-lGc">
             <objects>
-                <navigationController storyboardIdentifier="Logs" automaticallyAdjustsScrollViewInsets="NO" id="3CJ-ep-uee" customClass="CocoaDebugNavigationController" customModule="CocoaDebug" customModuleProvider="target" sceneMemberID="viewController">
+                <navigationController storyboardIdentifier="Logs" id="3CJ-ep-uee" customClass="CocoaDebugNavigationController" customModule="CocoaDebug" customModuleProvider="target" sceneMemberID="viewController">
                     <tabBarItem key="tabBarItem" title="Logs" image="_icon_file_type_logs" selectedImage="_icon_file_type_logs" id="Uuf-aW-P9g"/>
                     <toolbarItems/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="EEW-tV-ACR">
                         <rect key="frame" x="0.0" y="44" width="414" height="44"/>
                         <autoresizingMask key="autoresizingMask"/>
-                        <color key="barTintColor" red="0.1215686277" green="0.1294117719" blue="0.1411764771" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <textAttributes key="titleTextAttributes">
                             <color key="textColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
                         </textAttributes>

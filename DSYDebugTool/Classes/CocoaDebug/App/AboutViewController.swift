@@ -32,6 +32,12 @@ class AboutViewController: UITableViewController {
 //
 //        self.versionLabel.text = "CocoaDebug Version ".appending(version)
         
+        extendedLayoutIncludesOpaqueBars = true
+        edgesForExtendedLayout = .all
+        if #available(iOS 11.0, *) {
+            tableView.contentInsetAdjustmentBehavior = .always
+        }
+        
         tableView.tableFooterView = UIView()
     }
 }

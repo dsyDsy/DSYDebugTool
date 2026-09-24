@@ -68,24 +68,6 @@
     }
 }
 
-    
-    //swift:
-    
-    //bugfix #issues-158
-//    if #available(iOS 13, *) {
-//        let appearance = UINavigationBarAppearance()
-//        appearance.configureWithOpaqueBackground()
-//        // self.navigationController?.navigationBar.isTranslucent = true  // pass "true" for fixing iOS 15.0 black bg issue
-//        // self.navigationController?.navigationBar.tintColor = UIColor.white // We need to set tintcolor for iOS 15.0
-//        appearance.shadowColor = .clear    //removing navigationbar 1 px bottom border.
-////            UINavigationBar.appearance().standardAppearance = appearance
-////            UINavigationBar.appearance().scrollEdgeAppearance = appearance
-//        self.navigationBar.standardAppearance = appearance
-//        self.navigationBar.scrollEdgeAppearance = appearance
-//    }
-    
-}
-
 - (void)exit {
     [self.navigationController dismissViewControllerAnimated:YES completion:nil];
 }
@@ -154,8 +136,9 @@
 - (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
     // Ensure sandbox list refreshes its colors promptly when interface style changes
-    self.navigationController.navigationBar.barTintColor =  _Sandboxer.shared.mainClor;
-    self.navigationItem.backBarButtonItem.tintColor =  _Sandboxer.shared.mainClor;
+    self.navigationController.navigationBar.barTintColor = nil;
+    self.navigationController.navigationBar.backgroundColor = [UIColor clearColor];
+    self.navigationItem.backBarButtonItem.tintColor = _Sandboxer.shared.mainClor;
     if (@available(iOS 13.0, *)) {
         if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
             [self.tableView reloadData];
@@ -235,17 +218,17 @@
         }
     }
     
-    // 动态调整底部 inset，确保滑动至最后一行时不被 TabBar 遮挡，并保留 12pt 安全边距
+    // 仅当系统的 safeAreaInsets.bottom 未能覆盖 TabBar 时做差额补偿，避免重复叠加导致底部多余巨大空白
     CGFloat safeBottom = 0;
     if (@available(iOS 11.0, *)) {
         safeBottom = self.view.safeAreaInsets.bottom;
     }
     CGFloat tabBarHeight = self.tabBarController.tabBar.frame.size.height;
-    CGFloat bottomInset = MAX(safeBottom, tabBarHeight) + 12.0;
+    CGFloat extraBottom = MAX(0, tabBarHeight - safeBottom);
     
     UIEdgeInsets insets = self.tableView.contentInset;
-    if (insets.bottom != bottomInset) {
-        insets.bottom = bottomInset;
+    if (insets.bottom != extraBottom) {
+        insets.bottom = extraBottom;
         self.tableView.contentInset = insets;
         self.tableView.scrollIndicatorInsets = insets;
     }

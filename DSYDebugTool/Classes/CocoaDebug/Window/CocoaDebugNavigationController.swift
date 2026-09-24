@@ -18,35 +18,33 @@ class CocoaDebugNavigationController: UINavigationController {
         }
         
         navigationBar.isTranslucent = true
+        navigationBar.barTintColor = nil
+        navigationBar.backgroundColor = .clear
         navigationBar.tintColor = Color.mainGreen
         navigationBar.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
                                              .foregroundColor: Color.mainGreen]
         
         setupCloseButton()
         
-        if #available(iOS 26.0, *) {
-            // iOS 26+ 启用系统 Glass 材质
-            navigationBar.overrideUserInterfaceStyle = .dark
-            
+        if #available(iOS 13.0, *) {
             let appearance = UINavigationBarAppearance()
             appearance.configureWithDefaultBackground()
-            if #available(iOS 27.0, *) {
-                // iOS 27+ 系统强制 glass 材质由 appearance 决定暗色
-                appearance.overrideUserInterfaceStyle = .dark
+            appearance.shadowColor = .clear
+            appearance.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
+                                              .foregroundColor: Color.mainGreen]
+            if #available(iOS 26.0, *) {
+                navigationBar.overrideUserInterfaceStyle = .dark
+                if #available(iOS 27.0, *) {
+                    appearance.overrideUserInterfaceStyle = .dark
+                }
             }
-            appearance.shadowColor = .clear
-            appearance.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
-                                              .foregroundColor: Color.mainGreen]
+            
             self.navigationBar.standardAppearance = appearance
             self.navigationBar.scrollEdgeAppearance = appearance
-        } else if #available(iOS 13.0, *) {
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithDefaultBackground()
-            appearance.shadowColor = .clear
-            appearance.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
-                                              .foregroundColor: Color.mainGreen]
-            self.navigationBar.standardAppearance = appearance
-            self.navigationBar.scrollEdgeAppearance = appearance
+            self.navigationBar.compactAppearance = appearance
+            if #available(iOS 15.0, *) {
+                self.navigationBar.compactScrollEdgeAppearance = appearance
+            }
         }
     }
     

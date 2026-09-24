@@ -34,6 +34,12 @@ class IgnoredURLsViewController: UITableViewController {
         
         tableView.tableFooterView = UIView()
         
+        extendedLayoutIncludesOpaqueBars = true
+        edgesForExtendedLayout = .all
+        if #available(iOS 11.0, *) {
+            tableView.contentInsetAdjustmentBehavior = .always
+        }
+        
         ignoredURLs = CocoaDebugSettings.shared.ignoredURLs
         onlyURLs = CocoaDebugSettings.shared.onlyURLs
         

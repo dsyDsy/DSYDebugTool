@@ -317,6 +317,12 @@ class NetworkDetailViewController: UITableViewController, MFMailComposeViewContr
         
         closeItem.tintColor = Color.mainGreen
         
+        extendedLayoutIncludesOpaqueBars = true
+        edgesForExtendedLayout = .all
+        if #available(iOS 11.0, *) {
+            tableView.contentInsetAdjustmentBehavior = .always
+        }
+        
         //detect the request format (JSON/Form)
         detectRequestSerializer()
         
