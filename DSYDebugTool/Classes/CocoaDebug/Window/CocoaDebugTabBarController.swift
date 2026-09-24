@@ -40,7 +40,15 @@ class CocoaDebugTabBarController: UITabBarController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        UIApplication.shared.keyWindow?.endEditing(true)
+        if #available(iOS 13.0, *) {
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .forEach { $0.endEditing(true) }
+        } else {
+            UIApplication.shared.keyWindow?.endEditing(true)
+        }
+        view.endEditing(true)
         
         setChildControllers()
         
@@ -75,6 +83,7 @@ class CocoaDebugTabBarController: UITabBarController {
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         WindowHelper.shared.displayedList = false
+        WindowHelper.shared.restoreKeyWindowToHostApp()
     }
     
     //MARK: - private

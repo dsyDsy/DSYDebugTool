@@ -178,9 +178,10 @@ extension Data {
 extension String {
     var hexColor: UIColor {
         let hex = trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int = UInt32()
-        Scanner(string: hex).scanHexInt32(&int)
-        var a, r, g, b: UInt32
+        guard let int = UInt64(hex, radix: 16) else {
+            return .clear
+        }
+        var a, r, g, b: UInt64
         switch hex.count {
         case 3: // RGB (12-bit)
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
@@ -265,10 +266,7 @@ extension UIWindow {
     }
     
     
-    open override var canBecomeFirstResponder: Bool {
-        return true
-    }
-    
+
     open override func motionBegan(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
         super.motionBegan(motion, with: event)
         
