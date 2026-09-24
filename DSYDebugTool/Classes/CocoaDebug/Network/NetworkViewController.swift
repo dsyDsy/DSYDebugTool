@@ -92,7 +92,18 @@ class NetworkViewController: UIViewController {
     //MARK: - init
     override func viewDidLoad() {
         super.viewDidLoad()
+        extendedLayoutIncludesOpaqueBars = true
+        edgesForExtendedLayout = .all
         view.backgroundColor = .black
+        
+        // 保证在各种环境下列表延伸到页面底边，避免出现底部白块并使内容穿透 TabBar
+        if let bottomConstraint = view.constraints.first(where: {
+            ($0.firstItem as? UIView == tableView && $0.firstAttribute == .bottom && $0.secondItem !== view) ||
+            ($0.secondItem as? UIView == tableView && $0.secondAttribute == .bottom && $0.firstItem !== view)
+        }) {
+            bottomConstraint.isActive = false
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
+        }
         
         let tap = UITapGestureRecognizer.init(target: self, action: #selector(didTapView))
         tap.cancelsTouchesInView = false
@@ -142,6 +153,15 @@ class NetworkViewController: UIViewController {
         
         if models?.count ?? 0 > CocoaDebugSettings.shared.networkLastIndex && CocoaDebugSettings.shared.networkLastIndex > 0 {
             tableView.tableViewScrollToIndex(index: CocoaDebugSettings.shared.networkLastIndex, animated: false)
+        }
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let bottomInset = max(view.safeAreaInsets.bottom, tabBarController?.tabBar.bounds.height ?? 0)
+        if tableView.contentInset.bottom != bottomInset {
+            tableView.contentInset.bottom = bottomInset
+            tableView.scrollIndicatorInsets.bottom = bottomInset
         }
     }
     

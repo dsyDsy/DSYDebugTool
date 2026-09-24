@@ -278,7 +278,20 @@ class LogViewController: UIViewController {
     //MARK: - init
     override func viewDidLoad() {
         super.viewDidLoad()
+        extendedLayoutIncludesOpaqueBars = true
+        edgesForExtendedLayout = .all
         view.backgroundColor = .black
+        
+        // 保证三个日志列表延伸到底边以适配 TabBar 的 Glass 穿透效果
+        for tv in [defaultTableView, rnTableView, webTableView] {
+            if let tv = tv, let bottomConstraint = view.constraints.first(where: {
+                ($0.firstItem as? UIView == tv && $0.firstAttribute == .bottom && $0.secondItem !== view) ||
+                ($0.secondItem as? UIView == tv && $0.secondAttribute == .bottom && $0.firstItem !== view)
+            }) {
+                bottomConstraint.isActive = false
+                tv.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
+            }
+        }
         
         let tap = UITapGestureRecognizer.init(target: self, action: #selector(didTapView))
         tap.cancelsTouchesInView = false
@@ -390,6 +403,19 @@ class LogViewController: UIViewController {
             textFieldInsideSearchBar3.backgroundColor = .white
         }
         textFieldInsideSearchBar3.returnKeyType = .default
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let bottomInset = max(view.safeAreaInsets.bottom, tabBarController?.tabBar.bounds.height ?? 0)
+        if defaultTableView.contentInset.bottom != bottomInset {
+            defaultTableView.contentInset.bottom = bottomInset
+            defaultTableView.scrollIndicatorInsets.bottom = bottomInset
+            rnTableView.contentInset.bottom = bottomInset
+            rnTableView.scrollIndicatorInsets.bottom = bottomInset
+            webTableView.contentInset.bottom = bottomInset
+            webTableView.scrollIndicatorInsets.bottom = bottomInset
+        }
     }
     
     override func viewWillDisappear(_ animated: Bool) {

@@ -99,10 +99,9 @@ extension CocoaDebugViewController: BubbleDelegate {
         let storyboard = UIStoryboard(name: "Manager", bundle: Bundle(for: CocoaDebug.self))
         guard let vc = storyboard.instantiateInitialViewController() else {return}
         if #available(iOS 13.0, *) {
-            vc.view.backgroundColor = .systemBackground
-        } else {
-            vc.view.backgroundColor = .white
+            vc.overrideUserInterfaceStyle = .dark
         }
+        vc.view.backgroundColor = "#1f2124".hexColor
         vc.modalPresentationStyle = .fullScreen
         self.present(vc, animated: true) { [weak self] in
             // 进入全屏后，临时激活为 KeyWindow 以便在控制台搜索栏内输入过滤文字

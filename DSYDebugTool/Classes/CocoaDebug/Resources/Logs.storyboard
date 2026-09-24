@@ -219,10 +219,10 @@
                             <constraint firstAttribute="trailing" secondItem="iwa-b2-R5v" secondAttribute="trailing" id="Vvu-bK-4Tx"/>
                             <constraint firstAttribute="trailing" secondItem="mNu-i0-KLy" secondAttribute="trailing" id="YJi-Eo-s2N"/>
                             <constraint firstItem="iwa-b2-R5v" firstAttribute="leading" secondItem="C0A-8K-msL" secondAttribute="leading" id="aRj-me-LDN"/>
-                            <constraint firstItem="tUW-lE-b31" firstAttribute="top" secondItem="iwa-b2-R5v" secondAttribute="bottom" id="b8C-bH-nR3"/>
-                            <constraint firstItem="tUW-lE-b31" firstAttribute="top" secondItem="mNu-i0-KLy" secondAttribute="bottom" id="db4-LD-w3q"/>
+                            <constraint firstAttribute="bottom" secondItem="iwa-b2-R5v" secondAttribute="bottom" id="b8C-bH-nR3"/>
+                            <constraint firstAttribute="bottom" secondItem="mNu-i0-KLy" secondAttribute="bottom" id="db4-LD-w3q"/>
                             <constraint firstItem="mNu-i0-KLy" firstAttribute="top" secondItem="UzN-vB-IsZ" secondAttribute="bottom" constant="44" id="hrk-jP-uk7"/>
-                            <constraint firstItem="tUW-lE-b31" firstAttribute="top" secondItem="fq3-3m-DV4" secondAttribute="bottom" id="i7X-iQ-ijZ"/>
+                            <constraint firstAttribute="bottom" secondItem="fq3-3m-DV4" secondAttribute="bottom" id="i7X-iQ-ijZ"/>
                             <constraint firstItem="fq3-3m-DV4" firstAttribute="top" secondItem="C0A-8K-msL" secondAttribute="top" constant="44" id="or2-BD-5kJ"/>
                             <constraint firstItem="uvy-4Z-9DD" firstAttribute="leading" secondItem="C0A-8K-msL" secondAttribute="leading" id="wbK-ee-0e8"/>
                             <constraint firstItem="jdZ-56-n8X" firstAttribute="leading" secondItem="C0A-8K-msL" secondAttribute="leading" id="wuw-z3-kDY"/>

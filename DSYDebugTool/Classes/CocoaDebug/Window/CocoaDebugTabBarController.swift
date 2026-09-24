@@ -41,6 +41,7 @@ class CocoaDebugTabBarController: UITabBarController {
         super.viewDidLoad()
         
         if #available(iOS 13.0, *) {
+            self.overrideUserInterfaceStyle = .dark
             UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .flatMap { $0.windows }
@@ -87,12 +88,14 @@ class CocoaDebugTabBarController: UITabBarController {
             appearance.stackedLayoutAppearance.selected.iconColor = Color.mainGreen
             
             self.tabBar.standardAppearance = appearance
+            self.tabBar.scrollEdgeAppearance = appearance
             self.tabBar.tintColor = Color.mainGreen
             self.tabBar.unselectedItemTintColor = UIColor.white.withAlphaComponent(0.6)
-            // 仅让 TabBar 使用暗色系统材质，不改变其他页面的界面样式
+            // 确保 TabBar 始终使用暗色系统材质
             self.tabBar.overrideUserInterfaceStyle = .dark
-            self.tabBar.scrollEdgeAppearance = nil
             self.tabBar.isTranslucent = true
+            self.tabBar.backgroundColor = .clear
+            self.tabBar.barTintColor = nil
             // 保持根页面的导航层稳定，不跟随列表滚动自动收缩
             self.tabBarMinimizeBehavior = .never
         } else if #available(iOS 13, *) {
@@ -155,7 +158,7 @@ class CocoaDebugTabBarController: UITabBarController {
                 navAppearance.overrideUserInterfaceStyle = .dark
             }
             sandbox.navigationBar.standardAppearance = navAppearance
-            sandbox.navigationBar.scrollEdgeAppearance = nil
+            sandbox.navigationBar.scrollEdgeAppearance = navAppearance
         }
         
         //3.
@@ -192,7 +195,7 @@ class CocoaDebugTabBarController: UITabBarController {
                 navAppearance.overrideUserInterfaceStyle = .dark
             }
             nav.navigationBar.standardAppearance = navAppearance
-            nav.navigationBar.scrollEdgeAppearance = nil
+            nav.navigationBar.scrollEdgeAppearance = navAppearance
         }
         //****** copy codes from LogNavigationViewController.swift ******
         

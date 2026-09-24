@@ -13,6 +13,10 @@ class CocoaDebugNavigationController: UINavigationController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        if #available(iOS 13.0, *) {
+            self.overrideUserInterfaceStyle = .dark
+        }
+        
         navigationBar.isTranslucent = false //liman
         
         navigationBar.tintColor = Color.mainGreen
@@ -36,7 +40,7 @@ class CocoaDebugNavigationController: UINavigationController {
             appearance.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
                                               .foregroundColor: Color.mainGreen]
             self.navigationBar.standardAppearance = appearance
-            self.navigationBar.scrollEdgeAppearance = nil
+            self.navigationBar.scrollEdgeAppearance = appearance
         } else if #available(iOS 13.0, *) {
             // 原版样式：保持原有外观，不设置实色背景，避免将列表页面全部刷黑
             let appearance = UINavigationBarAppearance()
