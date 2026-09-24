@@ -205,7 +205,7 @@
                                 </prototypes>
                             </tableView>
                         </subviews>
-                        <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        <color key="backgroundColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <constraints>
                             <constraint firstItem="jdZ-56-n8X" firstAttribute="top" secondItem="UzN-vB-IsZ" secondAttribute="bottom" id="2Zl-nb-oHX"/>
                             <constraint firstItem="fq3-3m-DV4" firstAttribute="leading" secondItem="C0A-8K-msL" secondAttribute="leading" id="3Vt-Qy-odc"/>

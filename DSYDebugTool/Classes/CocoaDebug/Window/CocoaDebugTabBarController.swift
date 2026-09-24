@@ -97,6 +97,8 @@ class CocoaDebugTabBarController: UITabBarController {
             self.tabBarMinimizeBehavior = .never
         } else if #available(iOS 13, *) {
             // 原版样式：保持现有系统完全一致的外观
+            self.tabBar.backgroundColor = "#1f2124".hexColor
+            self.tabBar.barTintColor = "#1f2124".hexColor
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
             appearance.backgroundColor = "#1f2124".hexColor
@@ -177,24 +179,8 @@ class CocoaDebugTabBarController: UITabBarController {
                                                  .foregroundColor: Color.mainGreen]
         
         let selector = #selector(CocoaDebugNavigationController.exit)
-        let image = UIImage(named: "_icon_file_type_close", in: Bundle(for: CocoaDebugNavigationController.self), compatibleWith: nil)
-        
-        let leftItem: UIBarButtonItem
-        if #available(iOS 26.0, *) {
-            var config = UIButton.Configuration.tinted()
-            config.image = image
-            config.baseForegroundColor = Color.mainGreen
-            config.baseBackgroundColor = UIColor.white.withAlphaComponent(0.12)
-            config.cornerStyle = .capsule
-            config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
-            
-            let button = UIButton(configuration: config)
-            button.addTarget(self, action: selector, for: .touchUpInside)
-            leftItem = UIBarButtonItem(customView: button)
-        } else {
-            leftItem = UIBarButtonItem(image: image, style: .done, target: self, action: selector)
-            leftItem.tintColor = Color.mainGreen
-        }
+        let leftItem = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: selector)
+        leftItem.tintColor = Color.mainGreen
         nav.topViewController?.navigationItem.leftBarButtonItem = leftItem
         
         if #available(iOS 26.0, *) {

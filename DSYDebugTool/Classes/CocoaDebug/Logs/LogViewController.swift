@@ -278,6 +278,7 @@ class LogViewController: UIViewController {
     //MARK: - init
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = .black
         
         let tap = UITapGestureRecognizer.init(target: self, action: #selector(didTapView))
         tap.cancelsTouchesInView = false

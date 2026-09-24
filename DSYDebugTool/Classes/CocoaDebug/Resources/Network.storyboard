@@ -135,7 +135,7 @@
                                 <sections/>
                             </tableView>
                         </subviews>
-                        <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        <color key="backgroundColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <constraints>
                             <constraint firstItem="AxS-rn-hDA" firstAttribute="top" secondItem="HG7-0d-Yj9" secondAttribute="bottom" id="2fj-rT-RHQ"/>
                             <constraint firstItem="HG7-0d-Yj9" firstAttribute="leading" secondItem="jKX-oK-70h" secondAttribute="leading" id="IfW-Ku-Gg6"/>

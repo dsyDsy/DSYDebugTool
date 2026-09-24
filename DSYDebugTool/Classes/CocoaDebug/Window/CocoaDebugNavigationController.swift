@@ -56,25 +56,8 @@ class CocoaDebugNavigationController: UINavigationController {
         guard let rootVC = viewControllers.first else { return }
         
         let selector = #selector(CocoaDebugNavigationController.exit)
-        let image = UIImage(named: "_icon_file_type_close", in: Bundle(for: CocoaDebugNavigationController.self), compatibleWith: nil)
-        
-        let leftItem: UIBarButtonItem
-        if #available(iOS 26.0, *) {
-            // iOS 26+ 适配系统强制 glass 风格的顶部胶囊圆钮
-            var config = UIButton.Configuration.tinted()
-            config.image = image
-            config.baseForegroundColor = Color.mainGreen
-            config.baseBackgroundColor = UIColor.white.withAlphaComponent(0.12)
-            config.cornerStyle = .capsule
-            config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
-            
-            let button = UIButton(configuration: config)
-            button.addTarget(self, action: selector, for: .touchUpInside)
-            leftItem = UIBarButtonItem(customView: button)
-        } else {
-            leftItem = UIBarButtonItem(image: image, style: .done, target: self, action: selector)
-            leftItem.tintColor = Color.mainGreen
-        }
+        let leftItem = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: selector)
+        leftItem.tintColor = Color.mainGreen
         
         if let items = rootVC.navigationItem.leftBarButtonItems, items.count > 1 {
             var newItems = items
