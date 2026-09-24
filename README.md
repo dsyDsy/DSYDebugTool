@@ -19,7 +19,7 @@
 - **零侵入 Window 响应**：重构 `hitTest` 命中测试机制，悬浮球状态下透明区域完全穿透，不抢占宿主 App 的 `KeyWindow`。
 - **UIWindowScene 动态生命周期**：废弃异步轮询机制，基于系统场景通知动态接入活跃窗口场景。
 - **悬浮球停靠与持久化**：用户拖拽松手后平滑弹性贴边，自动持久化用户偏好坐标并在冷启动时精准恢复。
-- **Modern Glass 材质适配**：针对现代 iOS（iOS 26+ / iOS 27+）全面适配系统原生 Glass 毛玻璃效果与顶部操作控件。
+- **系统原生交互与 Glass 材质适配**：全模块顶部统一使用 iOS 原生关闭按钮（`UIBarButtonSystemItem.close`），并在 iOS 26+ / iOS 27+ 下全面适配系统原生 Glass 毛玻璃效果与深色交互。
 
 ---
 
@@ -30,39 +30,43 @@
 在 `Podfile` 中添加：
 
 ```ruby
-pod 'DSYDebugTool'
-```
+# 通过 Git 仓库与 Tag 方式引入
+pod 'DSYDebugTool', :git => 'https://github.com/dsyDsy/DSYDebugTool.git', :tag => '1.5.1'
 
-如需本地开发调试：
-
-```ruby
+# 本地开发与源码调试：
 pod 'DSYDebugTool', :path => '../DSYDebugTool'
 ```
 
-### 初始化与使用
+### 初始化与启动
 
-在应用启动（如 `didFinishLaunchingWithOptions`）时初始化：
+在应用启动（如 `didFinishLaunchingWithOptions`）时，通过调试管理器的 `start` 函数统一配置并启动：
 
 ```swift
-import DSYDebugTool
+// 1. 在 AppDelegate 或模块注册入口中调用 start 函数启动：
+FS_DebugManager.start(true, .dev)
 
-// 1. 自定义基础配置（可选）
-CocoaDebugSettings.shared.serverURL = "https://api.example.com"
-CocoaDebugSettings.shared.enableLogMonitoring = true
-CocoaDebugSettings.shared.enableCrashRecording = true
-
-// 2. 显示入口悬浮球
-CocoaDebug.showBubble()
+// 2. start 函数内部核心启动逻辑示例：
+public class func start(_ isDebug: Bool, _ environment: ServerEnvironment) {
+    #if canImport(DSYDebugTool)
+    guard isDebug else { return }
+    
+    // 自定义配置
+    CocoaDebugSettings.shared.serverURL = "https://api.example.com"
+    CocoaDebugSettings.shared.additionalViewController = FS_DebugHomeViewController()
+    CocoaDebugSettings.shared.enableLogMonitoring = true
+    CocoaDebugSettings.shared.enableCrashRecording = true
+    CocoaDebugSettings.shared.enableWKWebViewMonitoring = true
+    
+    // 显示入口悬浮球
+    CocoaDebug.showBubble()
+    #endif
+}
 ```
 
 隐藏悬浮球：
 
 ```swift
+#if canImport(DSYDebugTool)
 CocoaDebug.hideBubble()
+#endif
 ```
-
----
-
-## 许可协议
-
-本项目基于 MIT 协议分发。
