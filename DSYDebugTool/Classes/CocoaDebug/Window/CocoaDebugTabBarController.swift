@@ -148,12 +148,13 @@ class CocoaDebugTabBarController: UITabBarController {
         sandbox.tabBarItem.title = "Sandbox"
         sandbox.tabBarItem.image = UIImage.init(named: "_icon_file_type_sandbox", in: Bundle.init(for: CocoaDebug.self), compatibleWith: nil)
         
-        if #available(iOS 26.0, *) {
-            // 对齐 sandbox 导航栏的 glass 材质风格
+        if #available(iOS 13.0, *) {
+            // 对齐 sandbox 导航栏的 glass 半透材质风格
             sandbox.navigationBar.isTranslucent = true
             sandbox.navigationBar.overrideUserInterfaceStyle = .dark
             let navAppearance = UINavigationBarAppearance()
             navAppearance.configureWithDefaultBackground()
+            navAppearance.shadowColor = .clear
             if #available(iOS 27.0, *) {
                 navAppearance.overrideUserInterfaceStyle = .dark
             }
@@ -174,8 +175,7 @@ class CocoaDebugTabBarController: UITabBarController {
         nav.navigationBar.barTintColor = "#1f2124".hexColor
         nav.tabBarItem = UITabBarItem(tabBarSystemItem: .more, tag: 4)
 
-        //****** copy codes from LogNavigationViewController.swift ******
-        nav.navigationBar.isTranslucent = false
+        nav.navigationBar.isTranslucent = true
         
         nav.navigationBar.tintColor = Color.mainGreen
         nav.navigationBar.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
@@ -186,18 +186,17 @@ class CocoaDebugTabBarController: UITabBarController {
         leftItem.tintColor = Color.mainGreen
         nav.topViewController?.navigationItem.leftBarButtonItem = leftItem
         
-        if #available(iOS 26.0, *) {
-            nav.navigationBar.isTranslucent = true
+        if #available(iOS 13.0, *) {
             nav.navigationBar.overrideUserInterfaceStyle = .dark
             let navAppearance = UINavigationBarAppearance()
             navAppearance.configureWithDefaultBackground()
+            navAppearance.shadowColor = .clear
             if #available(iOS 27.0, *) {
                 navAppearance.overrideUserInterfaceStyle = .dark
             }
             nav.navigationBar.standardAppearance = navAppearance
             nav.navigationBar.scrollEdgeAppearance = navAppearance
         }
-        //****** copy codes from LogNavigationViewController.swift ******
         
         temp.append(nav)
         

@@ -1,7 +1,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'DSYDebugTool'
-  s.version          = '1.5.1'
+  s.version          = '1.5.2'
   s.summary          = 'A short description of DSYDebugTool.'
 
   s.description      = <<-DESC

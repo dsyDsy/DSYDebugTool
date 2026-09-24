@@ -61,10 +61,6 @@ class NetworkViewController: UIViewController {
         
         if reloadDataFinish == false {return}
         
-        if searchBar.isHidden != false {
-            searchBar.isHidden = false
-        }
-        
         self.models = (_HttpDatasource.shared().httpModels as NSArray as? [_HttpModel])
         self.cacheModels = self.models
         
@@ -96,14 +92,27 @@ class NetworkViewController: UIViewController {
         edgesForExtendedLayout = .all
         view.backgroundColor = .black
         
-        // 保证在各种环境下列表延伸到页面底边，避免出现底部白块并使内容穿透 TabBar
-        if let bottomConstraint = view.constraints.first(where: {
-            ($0.firstItem as? UIView == tableView && $0.firstAttribute == .bottom && $0.secondItem !== view) ||
-            ($0.secondItem as? UIView == tableView && $0.secondAttribute == .bottom && $0.firstItem !== view)
-        }) {
-            bottomConstraint.isActive = false
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
+        if #available(iOS 11.0, *) {
+            tableView.contentInsetAdjustmentBehavior = .always
         }
+        
+        // 将 searchBar 设置为 tableView 的 tableHeaderView，使其跟随列表流动穿透顶部导航栏
+        searchBar.removeFromSuperview()
+        searchBar.translatesAutoresizingMaskIntoConstraints = true
+        searchBar.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 44)
+        searchBar.barTintColor = .clear
+        searchBar.backgroundColor = .clear
+        searchBar.backgroundImage = UIImage()
+        tableView.tableHeaderView = searchBar
+        
+        // 确保列表延伸到页面全屏（穿透导航栏与 TabBar）
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            tableView.topAnchor.constraint(equalTo: view.topAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
         
         let tap = UITapGestureRecognizer.init(target: self, action: #selector(didTapView))
         tap.cancelsTouchesInView = false
@@ -135,7 +144,6 @@ class NetworkViewController: UIViewController {
         
         searchBar.delegate = self
         searchBar.text = CocoaDebugSettings.shared.networkSearchWord
-        searchBar.isHidden = true
         
         //hide searchBar icon
         if let textFieldInsideSearchBar = searchBar.value(forKey: "searchField") as? UITextField {
@@ -158,7 +166,15 @@ class NetworkViewController: UIViewController {
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        let bottomInset = max(view.safeAreaInsets.bottom, tabBarController?.tabBar.bounds.height ?? 0)
+        if let header = tableView.tableHeaderView, header.bounds.width != view.bounds.width {
+            header.frame.size.width = view.bounds.width
+            tableView.tableHeaderView = header
+        }
+        
+        let tabBarHeight = tabBarController?.tabBar.frame.height ?? 0
+        let safeBottom = view.safeAreaInsets.bottom
+        // 动态计算底部留白：确保滑动到最后一行时完全在 TabBar 上方呈现，且多留 12pt 呼吸间距，不被遮挡
+        let bottomInset = max(safeBottom, tabBarHeight) + 12
         if tableView.contentInset.bottom != bottomInset {
             tableView.contentInset.bottom = bottomInset
             tableView.scrollIndicatorInsets.bottom = bottomInset

@@ -17,8 +17,7 @@ class CocoaDebugNavigationController: UINavigationController {
             self.overrideUserInterfaceStyle = .dark
         }
         
-        navigationBar.isTranslucent = false //liman
-        
+        navigationBar.isTranslucent = true
         navigationBar.tintColor = Color.mainGreen
         navigationBar.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
                                              .foregroundColor: Color.mainGreen]
@@ -27,7 +26,6 @@ class CocoaDebugNavigationController: UINavigationController {
         
         if #available(iOS 26.0, *) {
             // iOS 26+ 启用系统 Glass 材质
-            navigationBar.isTranslucent = true
             navigationBar.overrideUserInterfaceStyle = .dark
             
             let appearance = UINavigationBarAppearance()
@@ -42,10 +40,11 @@ class CocoaDebugNavigationController: UINavigationController {
             self.navigationBar.standardAppearance = appearance
             self.navigationBar.scrollEdgeAppearance = appearance
         } else if #available(iOS 13.0, *) {
-            // 原版样式：保持原有外观，不设置实色背景，避免将列表页面全部刷黑
             let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
+            appearance.configureWithDefaultBackground()
             appearance.shadowColor = .clear
+            appearance.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
+                                              .foregroundColor: Color.mainGreen]
             self.navigationBar.standardAppearance = appearance
             self.navigationBar.scrollEdgeAppearance = appearance
         }

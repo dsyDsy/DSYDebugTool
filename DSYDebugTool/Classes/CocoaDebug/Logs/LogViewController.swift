@@ -282,15 +282,29 @@ class LogViewController: UIViewController {
         edgesForExtendedLayout = .all
         view.backgroundColor = .black
         
-        // 保证三个日志列表延伸到底边以适配 TabBar 的 Glass 穿透效果
-        for tv in [defaultTableView, rnTableView, webTableView] {
-            if let tv = tv, let bottomConstraint = view.constraints.first(where: {
-                ($0.firstItem as? UIView == tv && $0.firstAttribute == .bottom && $0.secondItem !== view) ||
-                ($0.secondItem as? UIView == tv && $0.secondAttribute == .bottom && $0.firstItem !== view)
-            }) {
-                bottomConstraint.isActive = false
-                tv.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
+        let tableViews = [defaultTableView, rnTableView, webTableView]
+        let searchBars = [defaultSearchBar, rnSearchBar, webSearchBar]
+        
+        for i in 0..<3 {
+            guard let tv = tableViews[i], let sb = searchBars[i] else { continue }
+            if #available(iOS 11.0, *) {
+                tv.contentInsetAdjustmentBehavior = .always
             }
+            sb.removeFromSuperview()
+            sb.translatesAutoresizingMaskIntoConstraints = true
+            sb.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: 44)
+            sb.barTintColor = .clear
+            sb.backgroundColor = .clear
+            sb.backgroundImage = UIImage()
+            tv.tableHeaderView = sb
+            
+            tv.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                tv.topAnchor.constraint(equalTo: view.topAnchor),
+                tv.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+                tv.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                tv.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+            ])
         }
         
         let tap = UITapGestureRecognizer.init(target: self, action: #selector(didTapView))
@@ -407,14 +421,20 @@ class LogViewController: UIViewController {
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        let bottomInset = max(view.safeAreaInsets.bottom, tabBarController?.tabBar.bounds.height ?? 0)
-        if defaultTableView.contentInset.bottom != bottomInset {
-            defaultTableView.contentInset.bottom = bottomInset
-            defaultTableView.scrollIndicatorInsets.bottom = bottomInset
-            rnTableView.contentInset.bottom = bottomInset
-            rnTableView.scrollIndicatorInsets.bottom = bottomInset
-            webTableView.contentInset.bottom = bottomInset
-            webTableView.scrollIndicatorInsets.bottom = bottomInset
+        let tabBarHeight = tabBarController?.tabBar.frame.height ?? 0
+        let safeBottom = view.safeAreaInsets.bottom
+        let bottomInset = max(safeBottom, tabBarHeight) + 12
+        
+        for (sb, tv) in [(defaultSearchBar, defaultTableView), (rnSearchBar, rnTableView), (webSearchBar, webTableView)] {
+            guard let tv = tv else { continue }
+            if let sb = sb, sb.bounds.width != view.bounds.width {
+                sb.frame.size.width = view.bounds.width
+                tv.tableHeaderView = sb
+            }
+            if tv.contentInset.bottom != bottomInset {
+                tv.contentInset.bottom = bottomInset
+                tv.scrollIndicatorInsets.bottom = bottomInset
+            }
         }
     }
     

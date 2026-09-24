@@ -27,7 +27,7 @@
                                 <color key="barTintColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <textInputTraits key="textInputTraits"/>
                             </searchBar>
-                            <tableView clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" contentInsetAdjustmentBehavior="never" indicatorStyle="white" dataMode="prototypes" style="plain" separatorStyle="none" rowHeight="126" sectionHeaderHeight="28" sectionFooterHeight="28" translatesAutoresizingMaskIntoConstraints="NO" id="HG7-0d-Yj9">
+                            <tableView clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" indicatorStyle="white" dataMode="prototypes" style="plain" separatorStyle="none" rowHeight="126" sectionHeaderHeight="28" sectionFooterHeight="28" translatesAutoresizingMaskIntoConstraints="NO" id="HG7-0d-Yj9">
                                 <rect key="frame" x="0.0" y="44" width="375" height="579"/>
                                 <color key="backgroundColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                 <gestureRecognizers/>
@@ -141,7 +141,7 @@
                             <constraint firstItem="HG7-0d-Yj9" firstAttribute="leading" secondItem="jKX-oK-70h" secondAttribute="leading" id="IfW-Ku-Gg6"/>
                             <constraint firstAttribute="trailing" secondItem="oGO-NT-3El" secondAttribute="trailing" id="KyL-Yw-9sb"/>
                             <constraint firstItem="oGO-NT-3El" firstAttribute="top" secondItem="5LO-XP-TDA" secondAttribute="bottom" id="Y93-vb-SXa"/>
-                            <constraint firstItem="HG7-0d-Yj9" firstAttribute="top" secondItem="jKX-oK-70h" secondAttribute="top" constant="44" id="a0q-kt-eHI"/>
+                            <constraint firstItem="HG7-0d-Yj9" firstAttribute="top" secondItem="jKX-oK-70h" secondAttribute="top" id="a0q-kt-eHI"/>
                             <constraint firstItem="oGO-NT-3El" firstAttribute="leading" secondItem="jKX-oK-70h" secondAttribute="leading" id="kcK-dA-bK2"/>
                             <constraint firstAttribute="trailing" secondItem="HG7-0d-Yj9" secondAttribute="trailing" id="sJA-Dl-pas"/>
                         </constraints>
@@ -386,7 +386,7 @@
                 <navigationController storyboardIdentifier="Network" automaticallyAdjustsScrollViewInsets="NO" id="n2b-Ib-iXr" customClass="CocoaDebugNavigationController" customModule="CocoaDebug" customModuleProvider="target" sceneMemberID="viewController">
                     <tabBarItem key="tabBarItem" title="Network" image="_icon_file_type_network" selectedImage="_icon_file_type_network" id="HZO-tF-0ia"/>
                     <toolbarItems/>
-                    <navigationBar key="navigationBar" contentMode="scaleToFill" translucent="NO" id="yog-aO-SHJ">
+                    <navigationBar key="navigationBar" contentMode="scaleToFill" id="yog-aO-SHJ">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="44"/>
                         <autoresizingMask key="autoresizingMask"/>
                         <color key="barTintColor" red="0.1215686277" green="0.1294117719" blue="0.1411764771" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>

@@ -83,6 +83,25 @@ class AppInfoViewController: UITableViewController {
         slowAnimationsSwitch.addTarget(self, action: #selector(slowAnimationsSwitchChanged), for: UIControl.Event.valueChanged)
         crashSwitch.addTarget(self, action: #selector(crashSwitchChanged), for: UIControl.Event.valueChanged)
         uiBlockingSwitch.addTarget(self, action: #selector(uiBlockingSwitchChanged), for: UIControl.Event.valueChanged)
+        
+        // 允许内容穿透到导航栏和 TabBar 区域
+        extendedLayoutIncludesOpaqueBars = true
+        edgesForExtendedLayout = .all
+        if #available(iOS 11.0, *) {
+            tableView.contentInsetAdjustmentBehavior = .always
+        }
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // 动态计算底部 inset，确保滑动至最后一行时不被 TabBar 遮挡，并保留安全间距
+        let safeBottom = view.safeAreaInsets.bottom
+        let tabBarHeight = tabBarController?.tabBar.frame.height ?? 0
+        let bottomInset = max(safeBottom, tabBarHeight) + 12
+        if tableView.contentInset.bottom != bottomInset {
+            tableView.contentInset.bottom = bottomInset
+            tableView.scrollIndicatorInsets.bottom = bottomInset
+        }
     }
     
     override func viewWillAppear(_ animated: Bool) {

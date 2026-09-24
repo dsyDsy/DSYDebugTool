@@ -46,8 +46,7 @@
 //liman
 - (void)customNavigationBar
 {
-    //****** copy codes from LogNavigationViewController.swift ******
-    self.navigationController.navigationBar.translucent = NO;
+    self.navigationController.navigationBar.translucent = YES;
     
     self.navigationController.navigationBar.tintColor = [_NetworkHelper shared].mainColor;
     self.navigationController.navigationBar.titleTextAttributes = @{
@@ -55,14 +54,19 @@
                                                                     NSForegroundColorAttributeName: [_NetworkHelper shared].mainColor
                                                                     };
     
-    //bugfix #issues-158
     if (@available(iOS 13.0, *)) {
+        self.navigationController.navigationBar.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
         UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
-        [appearance configureWithOpaqueBackground];
+        [appearance configureWithDefaultBackground];
         appearance.shadowColor = [UIColor clearColor];
+        appearance.titleTextAttributes = @{
+                                           NSFontAttributeName:[UIFont boldSystemFontOfSize:20],
+                                           NSForegroundColorAttributeName: [_NetworkHelper shared].mainColor
+                                           };
         self.navigationController.navigationBar.standardAppearance = appearance;
         self.navigationController.navigationBar.scrollEdgeAppearance = appearance;
     }
+}
 
     
     //swift:
@@ -106,10 +110,13 @@
     [self.view addGestureRecognizer:tap];
     
     // keep navigation bar consistent with other CocoaDebug pages
-  
     self.navigationItem.backBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"" style:UIBarButtonItemStylePlain target:nil action:nil];
-    self.navigationController.navigationBar.barTintColor =  _Sandboxer.shared.mainClor;
-    self.navigationItem.backBarButtonItem.tintColor =  _Sandboxer.shared.mainClor;
+    self.navigationController.navigationBar.tintColor = _Sandboxer.shared.mainClor;
+    self.navigationItem.backBarButtonItem.tintColor = _Sandboxer.shared.mainClor;
+    
+    // 允许内容穿透到导航栏和 TabBar 区域
+    self.extendedLayoutIncludesOpaqueBars = YES;
+    self.edgesForExtendedLayout = UIRectEdgeAll;
 
     //liman
     if (_IsStringEmpty(self.title)) {
@@ -177,21 +184,11 @@
     
     //
     self.view.backgroundColor = [UIColor blackColor];
-    self.tableView = [[UITableView alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - 44 - [UIApplication sharedApplication].statusBarFrame.size.height - 50) style:UITableViewStylePlain];
-    
-    
-    BOOL iPhoneX = NO;
+    self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStylePlain];
+    self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     if (@available(iOS 11.0, *)) {
-        UIWindow *mainWindow = [[UIApplication sharedApplication] keyWindow];
-        if (mainWindow.safeAreaInsets.top > 24.0) {
-            iPhoneX = YES;
-        }
+        self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAlways;
     }
-    
-    if (iPhoneX) {
-        self.tableView.frame = CGRectMake(0, 0, self.view.bounds.size.width, self.view.bounds.size.height - 44 - [UIApplication sharedApplication].statusBarFrame.size.height - 50 - 34);
-    }
-    
     
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
@@ -203,16 +200,13 @@
     [self.tableView registerClass:[_FileTableViewCell class] forCellReuseIdentifier:_FileTableViewCellReuseIdentifier];
     [self.view addSubview:self.tableView];
     
-    self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
+    self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 50)];
     self.searchBar.delegate = self;
-    if (@available(iOS 13.0, *)) {
-        self.searchBar.barTintColor = [UIColor clearColor];
-        self.searchBar.searchBarStyle = UISearchBarStyleMinimal;
-    } else {
-        self.searchBar.barTintColor = [UIColor blackColor];
-    }
+    self.searchBar.barTintColor = [UIColor clearColor];
+    self.searchBar.backgroundImage = [[UIImage alloc] init];
+    self.searchBar.backgroundColor = [UIColor clearColor];
+    self.searchBar.searchBarStyle = UISearchBarStyleMinimal;
     self.searchBar.enablesReturnKeyAutomatically = NO;
-    [self.view addSubview:self.searchBar];
     
     //hide searchBar icon
     UITextField *textFieldInsideSearchBar = [self.searchBar valueForKey:@"searchField"];
@@ -225,6 +219,36 @@
         textFieldInsideSearchBar.backgroundColor = [UIColor whiteColor];
     }
     textFieldInsideSearchBar.returnKeyType = UIReturnKeyDefault;
+    
+    self.tableView.tableHeaderView = self.searchBar;
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    
+    // 动态更新 searchBar 宽度
+    if (self.searchBar && self.searchBar.superview) {
+        CGFloat currentWidth = self.view.bounds.size.width;
+        if (self.searchBar.frame.size.width != currentWidth) {
+            self.searchBar.frame = CGRectMake(0, 0, currentWidth, 50);
+            self.tableView.tableHeaderView = self.searchBar;
+        }
+    }
+    
+    // 动态调整底部 inset，确保滑动至最后一行时不被 TabBar 遮挡，并保留 12pt 安全边距
+    CGFloat safeBottom = 0;
+    if (@available(iOS 11.0, *)) {
+        safeBottom = self.view.safeAreaInsets.bottom;
+    }
+    CGFloat tabBarHeight = self.tabBarController.tabBar.frame.size.height;
+    CGFloat bottomInset = MAX(safeBottom, tabBarHeight) + 12.0;
+    
+    UIEdgeInsets insets = self.tableView.contentInset;
+    if (insets.bottom != bottomInset) {
+        insets.bottom = bottomInset;
+        self.tableView.contentInset = insets;
+        self.tableView.scrollIndicatorInsets = insets;
+    }
 }
 
 - (void)registerForPreviewing {
@@ -651,11 +675,11 @@
 #pragma mark - UITableViewDelegate
 
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-    return self.searchBar;
+    return nil;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return 44;
+    return 0.01;
 }
 
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
