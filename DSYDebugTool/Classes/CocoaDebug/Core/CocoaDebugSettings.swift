@@ -35,11 +35,15 @@ import Foundation
         }
     }
     @objc public var slowAnimations: Bool = false {
-        didSet {            
-            if slowAnimations == false {
-                UIApplication.shared.windows.first?.layer.speed = 1;
+        didSet {
+            let speed: Float = slowAnimations ? 0.1 : 1.0
+            if #available(iOS 13.0, *) {
+                UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }
+                    .forEach { $0.layer.speed = speed }
             } else {
-                UIApplication.shared.windows.first?.layer.speed = 0.1;
+                UIApplication.shared.windows.first?.layer.speed = speed
             }
         }
     }
@@ -124,25 +128,9 @@ import Foundation
             UserDefaults.standard.set(showBubbleAndWindow, forKey: "showBubbleAndWindow_CocoaDebug")
             UserDefaults.standard.synchronize()
             
-            let x = WindowHelper.shared.vc.bubble.frame.origin.x
-            let width = WindowHelper.shared.vc.bubble.frame.size.width
-            
-            if showBubbleAndWindow == true
-            {
-                if x > UIScreen.main.bounds.size.width/2 {
-                    WindowHelper.shared.vc.bubble.frame.origin.x = UIScreen.main.bounds.size.width - width/8*8.25
-                } else {
-                    WindowHelper.shared.vc.bubble.frame.origin.x = -width + width/8*8.25
-                }
+            if showBubbleAndWindow {
                 WindowHelper.shared.enable()
-            }
-            else
-            {
-                if x > UIScreen.main.bounds.size.width/2 {
-                    WindowHelper.shared.vc.bubble.frame.origin.x = UIScreen.main.bounds.size.width
-                } else {
-                    WindowHelper.shared.vc.bubble.frame.origin.x = -width
-                }
+            } else {
                 WindowHelper.shared.disable()
             }
         }

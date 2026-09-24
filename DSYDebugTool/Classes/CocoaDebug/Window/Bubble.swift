@@ -39,17 +39,28 @@ class Bubble: UIView {
     
     
     static var originalPosition: CGPoint {
+        let screenBounds = UIScreen.main.bounds
+        let safeAreaTop: CGFloat = 44.0
+        let safeAreaBottom: CGFloat = 34.0
+        
+        let minX = _width / 2
+        let maxX = max(minX, screenBounds.width - _width / 2)
+        let minY = safeAreaTop + _height / 2
+        let maxY = max(minY, screenBounds.height - safeAreaBottom - _height / 2)
+        
         if CocoaDebugSettings.shared.bubbleFrameX != 0 && CocoaDebugSettings.shared.bubbleFrameY != 0 {
-            return CGPoint(x: CGFloat(CocoaDebugSettings.shared.bubbleFrameX), y: CGFloat(CocoaDebugSettings.shared.bubbleFrameY))
+            var x = CGFloat(CocoaDebugSettings.shared.bubbleFrameX)
+            var y = CGFloat(CocoaDebugSettings.shared.bubbleFrameY)
+            
+            // 严格做屏幕安全区边界 Clamp，防止拖动越界或换设备尺寸导致小球永久脱离屏幕
+            x = max(minX, min(maxX, x))
+            y = max(minY, min(maxY, y))
+            
+            return CGPoint(x: x, y: y)
         }
         
-        var h = 0
-        if #available(iOS 11.0, *) {
-            if UIApplication.shared.keyWindow?.safeAreaInsets.top ?? 0 > 24.0 {
-                h = 16;
-            }
-        }
-        return CGPoint(x: 1.875 + _width/2, y: UIScreen.main.bounds.size.height/2 - _height - CGFloat(h))
+        let defaultY = max(minY, min(maxY, screenBounds.height / 2 - _height))
+        return CGPoint(x: 1.875 + _width / 2, y: defaultY)
     }
     
     static var size: CGSize {return CGSize(width: _width, height: _height)}
@@ -171,12 +182,42 @@ class Bubble: UIView {
                        }, completion: nil)
     }
     
-    func updateOrientation(newSize: CGSize) {
-        let oldSize = CGSize(width: newSize.height, height: newSize.width)
-        let percent = center.y / oldSize.height * 100
-        let newOrigin = newSize.height * percent / 100
-        let originX = frame.origin.x < newSize.height / 2 ? _width/8*4.25 : newSize.width - _width/8*4.25
-        self.center = CGPoint(x: originX, y: newOrigin)
+    func updateOrientation(newSize: CGSize, oldSize: CGSize? = nil) {
+        guard newSize.width > 0 && newSize.height > 0 else { return }
+        
+        let containerBounds = self.superview?.bounds.size ?? UIScreen.main.bounds.size
+        let referenceOldSize = oldSize ?? containerBounds
+        
+        // 尺寸未发生变化时直接忽略，避免启动期触发非旋转事件导致坐标被误算
+        if referenceOldSize.width == newSize.width && referenceOldSize.height == newSize.height {
+            return
+        }
+        
+        // Y 轴比例计算：以旧高度为参考，严格限制在 [0, 1] 比例内
+        let safeOldHeight = referenceOldSize.height > 0 ? referenceOldSize.height : UIScreen.main.bounds.height
+        let ratioY = max(0.0, min(1.0, center.y / safeOldHeight))
+        var newY = newSize.height * ratioY
+        
+        // X 轴贴边计算：保留原有靠左或靠右的倾向
+        let isRightSide = center.x > (referenceOldSize.width / 2.0)
+        let margin = width / 8.0 * 4.25
+        let newX = isRightSide ? (newSize.width - margin) : margin
+        
+        // 安全区边界 Clamp
+        let safeTop = self.superview?.safeAreaInsets.top ?? self.window?.safeAreaInsets.top ?? 44.0
+        let safeBottom = self.superview?.safeAreaInsets.bottom ?? self.window?.safeAreaInsets.bottom ?? 34.0
+        let effectiveTop = safeTop > 0 ? safeTop : 44.0
+        let effectiveBottom = safeBottom > 0 ? safeBottom : 34.0
+        
+        let minY = effectiveTop + height / 2.0
+        let maxY = max(minY, newSize.height - effectiveBottom - height / 2.0)
+        newY = max(minY, min(maxY, newY))
+        
+        self.center = CGPoint(x: newX, y: newY)
+        
+        // 旋转后同步更新持久化位置
+        CocoaDebugSettings.shared.bubbleFrameX = Float(newX)
+        CocoaDebugSettings.shared.bubbleFrameY = Float(newY)
     }
     
     //MARK: - init
@@ -294,66 +335,44 @@ class Bubble: UIView {
     
     @objc func panDidFire(panner: UIPanGestureRecognizer) {
         if panner.state == .began {
-            UIView.animate(withDuration: 0.5, delay: 0, options: .curveLinear, animations: { [weak self] in
-                self?.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveLinear, animations: { [weak self] in
+                self?.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
             }, completion: nil)
         }
         
         let offset = panner.translation(in: self.superview)
         panner.setTranslation(CGPoint.zero, in: self.superview)
-        var center = self.center
-        center.x += offset.x
-        center.y += offset.y
-        self.center = center
+        self.center = CGPoint(x: self.center.x + offset.x, y: self.center.y + offset.y)
         
         if panner.state == .ended || panner.state == .cancelled {
+            let containerSize = self.superview?.bounds.size ?? UIScreen.main.bounds.size
+            let containerWidth = containerSize.width > 0 ? containerSize.width : UIScreen.main.bounds.width
+            let containerHeight = containerSize.height > 0 ? containerSize.height : UIScreen.main.bounds.height
             
-            var frameInset: UIEdgeInsets
+            let safeInsets = self.superview?.safeAreaInsets ?? self.window?.safeAreaInsets ?? UIEdgeInsets(top: 44, left: 0, bottom: 34, right: 0)
+            let effectiveTop = safeInsets.top > 0 ? safeInsets.top : 44.0
+            let effectiveBottom = safeInsets.bottom > 0 ? safeInsets.bottom : 34.0
             
-            if #available(iOS 11.0, *) {
-                frameInset = UIApplication.shared.keyWindow?.safeAreaInsets ?? UIEdgeInsets(top: UIApplication.shared.statusBarFrame.height, left: 0, bottom: 0, right: 0)
-            } else {
-                frameInset = UIDevice.current.orientation.isPortrait ? UIEdgeInsets(top: 20, left: 0, bottom: 0, right: 0) : .zero
-            }
+            // X 轴贴边计算：用户停在左半屏则贴左，右半屏则贴右
+            let margin = self.width / 8.0 * 4.25
+            let finalX = self.center.x > (containerWidth / 2.0)
+                ? (containerWidth - margin)
+                : margin
             
-            let location = panner.location(in: self.superview)
-            let velocity = panner.velocity(in: self.superview)
+            // Y 轴真实停靠：用户松手在哪个高度就停留在哪个高度，严格限制在安全区域内，彻底杜绝速度公式把小球甩到底部
+            let minY = effectiveTop + self.height / 2.0
+            let maxY = max(minY, containerHeight - effectiveBottom - self.height / 2.0)
+            let finalY = max(minY, min(maxY, self.center.y))
             
-            var finalX: Double = Double(self.width/8*4.25)
-            var finalY: Double = Double(location.y)
-            
-            if location.x > UIScreen.main.bounds.size.width / 2 {
-                finalX = Double(UIScreen.main.bounds.size.width) - Double(self.width/8*4.25)
-            }
-            
-            self.changeSideDisplay()
-            
-            let horizentalVelocity = abs(velocity.x)
-            let positionX = abs(finalX - Double(location.x))
-            
-            let velocityForce = sqrt(pow(velocity.x, 2) * pow(velocity.y, 2))
-            
-            let durationAnimation = (velocityForce > 1000.0) ? min(0.3, positionX / Double(horizentalVelocity)) : 0.3
-            
-            if velocityForce > 1000.0 {
-                finalY += Double(velocity.y) * durationAnimation
-            }
-            
-            if finalY > Double(UIScreen.main.bounds.size.height) - Double(self.height/8*4.25) {
-                finalY = Double(UIScreen.main.bounds.size.height) - Double(frameInset.bottom) - Double(self.height/8*4.25)
-            } else if finalY < Double(self.height/8*4.25) + Double(frameInset.top)  {
-                finalY = Double(self.height/8*4.25) + Double(frameInset.top)
-            }
-            
-            //
+            // 真实持久化保存用户最终停靠坐标
             CocoaDebugSettings.shared.bubbleFrameX = Float(finalX)
             CocoaDebugSettings.shared.bubbleFrameY = Float(finalY)
             
-            //
-            UIView.animate(withDuration: durationAnimation * 5, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 6, options: .allowUserInteraction, animations: { [weak self] in
+            // 平滑弹性贴边动画
+            UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 1.0, options: [.allowUserInteraction, .beginFromCurrentState], animations: { [weak self] in
                 self?.center = CGPoint(x: finalX, y: finalY)
-                self?.transform = CGAffineTransform.identity
-            }, completion:nil)
+                self?.transform = .identity
+            }, completion: nil)
         }
     }
 }
