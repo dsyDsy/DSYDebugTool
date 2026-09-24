@@ -55,14 +55,52 @@ class CocoaDebugTabBarController: UITabBarController {
         self.selectedIndex = CocoaDebugSettings.shared.tabBarSelectItem 
         self.tabBar.tintColor = Color.mainGreen
         self.view.backgroundColor = "#1f2124".hexColor
-        //bugfix #issues-158
-        if #available(iOS 13, *) {
+        
+        configTabStyles()
+    }
+    
+    private func configTabStyles() {
+        if #available(iOS 26.0, *) {
+            let appearance = UITabBarAppearance()
+            // iOS 26+ 交给系统提供 TabBar 材质，避免固定背景覆盖内容层
+            appearance.configureWithDefaultBackground()
+            if #available(iOS 27.0, *) {
+                // iOS 27+ 的系统材质由 bar appearance 决定界面样式
+                appearance.overrideUserInterfaceStyle = .dark
+            }
+            appearance.shadowColor = .clear
+            
+            // 配置未选中状态
+            let normalAttributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: UIColor.white.withAlphaComponent(0.6),
+                .font: UIFont.systemFont(ofSize: 10)
+            ]
+            appearance.stackedLayoutAppearance.normal.titleTextAttributes = normalAttributes
+            appearance.stackedLayoutAppearance.normal.iconColor = UIColor.white.withAlphaComponent(0.6)
+            
+            // 配置选中状态
+            let selectedAttributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: Color.mainGreen,
+                .font: UIFont.systemFont(ofSize: 10, weight: .bold)
+            ]
+            appearance.stackedLayoutAppearance.selected.titleTextAttributes = selectedAttributes
+            appearance.stackedLayoutAppearance.selected.iconColor = Color.mainGreen
+            
+            self.tabBar.standardAppearance = appearance
+            self.tabBar.tintColor = Color.mainGreen
+            self.tabBar.unselectedItemTintColor = UIColor.white.withAlphaComponent(0.6)
+            // 仅让 TabBar 使用暗色系统材质，不改变其他页面的界面样式
+            self.tabBar.overrideUserInterfaceStyle = .dark
+            self.tabBar.scrollEdgeAppearance = nil
+            self.tabBar.isTranslucent = true
+            // 保持根页面的导航层稳定，不跟随列表滚动自动收缩
+            self.tabBarMinimizeBehavior = .never
+        } else if #available(iOS 13, *) {
+            // 原版样式：保持现有系统完全一致的外观
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
             appearance.backgroundColor = "#1f2124".hexColor
-            appearance.shadowColor = .clear    //removing navigationbar 1 px bottom border.
-//            self.tabBar.appearance().standardAppearance = appearance
-//            self.tabBar.appearance().scrollEdgeAppearance = appearance
+            appearance.shadowColor = .clear
             self.tabBar.standardAppearance = appearance
             if #available(iOS 15.0, *) {
                 self.tabBar.scrollEdgeAppearance = appearance
@@ -105,6 +143,19 @@ class CocoaDebugTabBarController: UITabBarController {
         sandbox.tabBarItem.title = "Sandbox"
         sandbox.tabBarItem.image = UIImage.init(named: "_icon_file_type_sandbox", in: Bundle.init(for: CocoaDebug.self), compatibleWith: nil)
         
+        if #available(iOS 26.0, *) {
+            // 对齐 sandbox 导航栏的 glass 材质风格
+            sandbox.navigationBar.isTranslucent = true
+            sandbox.navigationBar.overrideUserInterfaceStyle = .dark
+            let navAppearance = UINavigationBarAppearance()
+            navAppearance.configureWithDefaultBackground()
+            if #available(iOS 27.0, *) {
+                navAppearance.overrideUserInterfaceStyle = .dark
+            }
+            sandbox.navigationBar.standardAppearance = navAppearance
+            sandbox.navigationBar.scrollEdgeAppearance = nil
+        }
+        
         //3.
         guard let additionalViewController = CocoaDebugSettings.shared.additionalViewController else {
             self.viewControllers = [network, logs, sandbox, app]
@@ -114,9 +165,9 @@ class CocoaDebugTabBarController: UITabBarController {
         //4.Add additional controller
         var temp = [network, logs, sandbox, app]
         
-        let nav = UINavigationController.init(rootViewController: additionalViewController)
+        let nav = UINavigationController(rootViewController: additionalViewController)
         nav.navigationBar.barTintColor = "#1f2124".hexColor
-        nav.tabBarItem = UITabBarItem.init(tabBarSystemItem: .more, tag: 4)
+        nav.tabBarItem = UITabBarItem(tabBarSystemItem: .more, tag: 4)
 
         //****** copy codes from LogNavigationViewController.swift ******
         nav.navigationBar.isTranslucent = false
@@ -126,13 +177,37 @@ class CocoaDebugTabBarController: UITabBarController {
                                                  .foregroundColor: Color.mainGreen]
         
         let selector = #selector(CocoaDebugNavigationController.exit)
-        
-        
         let image = UIImage(named: "_icon_file_type_close", in: Bundle(for: CocoaDebugNavigationController.self), compatibleWith: nil)
-        let leftItem = UIBarButtonItem(image: image,
-                                       style: .done, target: self, action: selector)
-        leftItem.tintColor = Color.mainGreen
+        
+        let leftItem: UIBarButtonItem
+        if #available(iOS 26.0, *) {
+            var config = UIButton.Configuration.tinted()
+            config.image = image
+            config.baseForegroundColor = Color.mainGreen
+            config.baseBackgroundColor = UIColor.white.withAlphaComponent(0.12)
+            config.cornerStyle = .capsule
+            config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
+            
+            let button = UIButton(configuration: config)
+            button.addTarget(self, action: selector, for: .touchUpInside)
+            leftItem = UIBarButtonItem(customView: button)
+        } else {
+            leftItem = UIBarButtonItem(image: image, style: .done, target: self, action: selector)
+            leftItem.tintColor = Color.mainGreen
+        }
         nav.topViewController?.navigationItem.leftBarButtonItem = leftItem
+        
+        if #available(iOS 26.0, *) {
+            nav.navigationBar.isTranslucent = true
+            nav.navigationBar.overrideUserInterfaceStyle = .dark
+            let navAppearance = UINavigationBarAppearance()
+            navAppearance.configureWithDefaultBackground()
+            if #available(iOS 27.0, *) {
+                navAppearance.overrideUserInterfaceStyle = .dark
+            }
+            nav.navigationBar.standardAppearance = navAppearance
+            nav.navigationBar.scrollEdgeAppearance = nil
+        }
         //****** copy codes from LogNavigationViewController.swift ******
         
         temp.append(nav)
