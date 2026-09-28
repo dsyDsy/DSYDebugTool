@@ -31,7 +31,7 @@
 
 ```ruby
 # 通过 Git 仓库与 Tag 方式引入
-pod 'DSYDebugTool', :git => 'https://github.com/dsyDsy/DSYDebugTool.git', :tag => '1.5.1'
+pod 'DSYDebugTool', :git => 'https://github.com/dsyDsy/DSYDebugTool.git', :tag => '1.6.0'
 
 # 本地开发与源码调试：
 pod 'DSYDebugTool', :path => '../DSYDebugTool'
