@@ -162,42 +162,46 @@ class CocoaDebugTabBarController: UITabBarController {
             sandbox.navigationBar.scrollEdgeAppearance = navAppearance
         }
         
-        //3.
+        //3. 统一配置系统自带的 moreNavigationController 样式（防御性适配超过5个页面的场景）
+        if #available(iOS 13.0, *) {
+            moreNavigationController.navigationBar.overrideUserInterfaceStyle = .dark
+            moreNavigationController.navigationBar.isTranslucent = true
+            moreNavigationController.navigationBar.barTintColor = nil
+            moreNavigationController.navigationBar.backgroundColor = .clear
+            moreNavigationController.navigationBar.tintColor = Color.mainGreen
+            moreNavigationController.navigationBar.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
+                                                                         .foregroundColor: Color.mainGreen]
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithDefaultBackground()
+            appearance.shadowColor = .clear
+            appearance.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
+                                              .foregroundColor: Color.mainGreen]
+            if #available(iOS 27.0, *) {
+                appearance.overrideUserInterfaceStyle = .dark
+            }
+            moreNavigationController.navigationBar.standardAppearance = appearance
+            moreNavigationController.navigationBar.scrollEdgeAppearance = appearance
+            moreNavigationController.navigationBar.compactAppearance = appearance
+            if #available(iOS 15.0, *) {
+                moreNavigationController.navigationBar.compactScrollEdgeAppearance = appearance
+            }
+        }
+        
+        //4.
         guard let additionalViewController = CocoaDebugSettings.shared.additionalViewController else {
             self.viewControllers = [network, logs, sandbox, app]
             return
         }
         
-        //4.Add additional controller
-        var temp = [network, logs, sandbox, app]
+        // 允许 additionalViewController 穿透扩展至顶部导航栏和底部 TabBar 安全区
+        additionalViewController.extendedLayoutIncludesOpaqueBars = true
+        additionalViewController.edgesForExtendedLayout = .all
         
-        let nav = UINavigationController(rootViewController: additionalViewController)
-        nav.navigationBar.barTintColor = "#1f2124".hexColor
+        //5. 使用统一的 CocoaDebugNavigationController，具备完整 Glass 材质、关闭按钮及安全区自适应能力
+        let nav = CocoaDebugNavigationController(rootViewController: additionalViewController)
         nav.tabBarItem = UITabBarItem(tabBarSystemItem: .more, tag: 4)
-
-        nav.navigationBar.isTranslucent = true
         
-        nav.navigationBar.tintColor = Color.mainGreen
-        nav.navigationBar.titleTextAttributes = [.font: UIFont.boldSystemFont(ofSize: 20),
-                                                 .foregroundColor: Color.mainGreen]
-        
-        let selector = #selector(CocoaDebugNavigationController.exit)
-        let leftItem = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: selector)
-        leftItem.tintColor = Color.mainGreen
-        nav.topViewController?.navigationItem.leftBarButtonItem = leftItem
-        
-        if #available(iOS 13.0, *) {
-            nav.navigationBar.overrideUserInterfaceStyle = .dark
-            let navAppearance = UINavigationBarAppearance()
-            navAppearance.configureWithDefaultBackground()
-            navAppearance.shadowColor = .clear
-            if #available(iOS 27.0, *) {
-                navAppearance.overrideUserInterfaceStyle = .dark
-            }
-            nav.navigationBar.standardAppearance = navAppearance
-            nav.navigationBar.scrollEdgeAppearance = navAppearance
-        }
-        
+        var temp = [network, logs, sandbox, app]
         temp.append(nav)
         
         self.viewControllers = temp
